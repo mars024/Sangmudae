@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>행렬 좌회전 시뮬레이터</title>
+<style>
+:root {
+  --bg-color: #0f172a;
+  --card-bg: #1e293b;
+  --accent-color: #38bdf8;
+  --accent-active: #0284c7;
+  --highlight-color: #f43f5e;
+  --text-color: #f8fafc;
+  --border-color: #334155;
+  --foot-highlight: #facc15;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app-container {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 10px;
+}
+
+.simulation-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #020617;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+#sim-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.bottom-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.btn {
+  background-color: var(--card-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn:active {
+  transform: scale(0.95);
+}
+
+.mode-selector {
+  display: flex;
+  background-color: var(--card-bg);
+  border-radius: 12px;
+  padding: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.mode-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 8px;
+  font-size: 13px;
+  font-weight: bold;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.mode-btn.active {
+  background-color: var(--accent-color);
+  color: #0f172a;
+}
+
+.step-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.step-controls .btn {
+  flex: 1;
+  padding: 12px;
+  font-size: 15px;
+}
+
+.btn-primary {
+  background-color: var(--accent-color);
+  color: #0f172a;
+  border: none;
+}
+
+.btn-play {
+  background-color: #10b981;
+  color: #ffffff;
+  border: none;
+}
+
+.btn-play.playing {
+  background-color: #f59e0b;
+}
+
+.step-indicator {
+  text-align: center;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.person-group {
+  transition: transform 0.3s linear;
+}
+
+.foot-path {
+  transition: fill 0.15s ease, stroke 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease;
+}
+
+@media (max-width: 600px) {
+  .app-container {
+    padding: 6px;
+  }
+  .simulation-wrapper {
+    border-radius: 12px;
+  }
+  .bottom-panel {
+    padding-top: 6px;
+    gap: 8px;
+  }
+  .mode-btn {
+    padding: 10px 6px;
+    font-size: 12px;
+  }
+  .step-controls .btn {
+    padding: 14px 8px; /* 터치 타겟 최적화 및 하단 일괄 배치 */
+    font-size: 14px;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="app-container">
+  <div class="simulation-wrapper">
+    <svg id="sim-canvas"></svg>
+  </div>
+
+  <div class="bottom-panel">
+    <div class="mode-selector">
+      <button class="mode-btn active" onclick="setMode(1)">1번 회전 (전체오 알고리즘)</button>
+      <button class="mode-btn" onclick="setMode(2)">2번 회전 (기본 직진)</button>
+    </div>
+
+    <div class="step-indicator">
+      현재 스텝: <span id="current-step" style="color: var(--accent-color); font-weight: bold;">0</span> / <span id="total-steps">0</span>
+    </div>
+
+    <div class="step-controls">
+      <button class="btn" onclick="resetSim()">↺ 초기화</button>
+      <button class="btn btn-play" id="play-btn" onclick="togglePlay()">▶ 재생</button>
+      <button class="btn btn-primary" onclick="prevStep()">◀ 이전</button>
+      <button class="btn btn-primary" onclick="nextStep()">다음 ▶</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let m = 4; 
+let n = 4; 
+let currentMode = 1;
+let currentStep = 0;
+let maxSteps = 25;
+let highlightedId = null;
+
+let isPlaying = false;
+let playInterval = null;
+
+let people = [];
+
+const svg = document.getElementById('sim-canvas');
+
+class Person {
+  constructor(id, r, c, initX, initY) {
+    this.id = id;
+    this.xIdx = r; 
+    this.yIdx = c; 
+    
+    this.x = initX;
+    this.y = initY;
+    this.angle = 0;
+    this.isMoving = true;
+    this.direction = 'NORTH';
+    this.isStopped = false;
+    
+    this.westStepCount = 0;
+    this.northStepCount = 0; 
+    
+    this.stopCountDown = -1; 
+    this.westCountDown = -1;
+
+    this.history = [{
+      x: this.x,
+      y: this.y,
+      angle: this.angle,
+      isMoving: this.isMoving,
+      direction: this.direction,
+      isStopped: this.isStopped,
+      westStepCount: this.westStepCount,
+      northStepCount: this.northStepCount,
+      stopCountDown: this.stopCountDown,
+      westCountDown: this.westCountDown
+    }];
+  }
+
+  moveNorth() {
+    this.y -= 1; 
+    this.angle = 0;
+    this.isMoving = true;
+    this.isStopped = false;
+    this.direction = 'NORTH';
+    this.northStepCount += 1; 
+    this.westStepCount = 0;   
+  }
+
+  moveWest() {
+    this.x -= 1; 
+    this.angle = -90;
+    this.isMoving = true;
+    this.isStopped = false;
+    this.direction = 'WEST';
+    this.westStepCount += 1;   
+    this.northStepCount = 0;  
+    this.westCountDown = -1;
+  }
+
+  stop() {
+    this.isMoving = false;
+    this.direction = 'STOP';
+    this.isStopped = true;
+    this.westStepCount = 0;   
+    this.northStepCount = 0;  
+    this.stopCountDown = -1;  
+  }
+
+  recordHistory() {
+    this.history.push({
+      x: this.x,
+      y: this.y,
+      angle: this.angle,
+      isMoving: this.isMoving,
+      direction: this.direction,
+      isStopped: this.isStopped,
+      westStepCount: this.westStepCount,
+      northStepCount: this.northStepCount,
+      stopCountDown: this.stopCountDown,
+      westCountDown: this.westCountDown
+    });
+  }
+}
+
+function init() {
+  buildSimulation();
+  window.addEventListener('resize', () => render(false));
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-btn').forEach((btn, idx) => {
+    btn.classList.toggle('active', idx + 1 === mode);
+  });
+  resetSim();
+}
+
+function buildSimulation() {
+  stopPlay();
+  currentStep = 0;
+
+  if (currentMode === 1) {
+    runLogicMode1();
+  } else {
+    runDefaultLogic();
+  }
+
+  document.getElementById('total-steps').innerText = maxSteps;
+  document.getElementById('current-step').innerText = currentStep;
+
+  render(true);
+}
+
+function runLogicMode1() {
+  people = []; 
+  
+  for (let r = 1; r <= m; r++) {
+    for (let c = 1; c <= n; c++) {
+      const id = `${r}-${c}`;
+      const initX = c * 2;
+      const initY = r * 2;
+      people.push(new Person(id, r, c, initX, initY));
+    }
+  }
+
+  const getPerson = (row, col) => {
+    return people.find(p => p.xIdx === row && p.yIdx === col);
+  };
+
+  maxSteps = 25;
+  
+  for (let step = 1; step <= maxSteps; step++) {
+    for (let r = 1; r <= m; r++) {
+        for (let c = 1; c <= n; c++) {
+            const p = getPerson(r, c);
+            if (!p) continue;
+
+            if (p.stopCountDown > 0) {
+                p.stopCountDown -= 1;
+                if (p.stopCountDown === 0) {
+                    p.stop(); 
+                    continue;
+                }
+            }
+
+            if (p.westCountDown > 0) {
+                p.westCountDown -= 1;
+                if(p.westCountDown === 0) {
+                    if (c === 4) {
+                        p.moveNorth();
+                    }
+                    p.moveWest();
+                    continue;
+                }
+            }
+
+            const headPerson = getPerson(1, c);
+            const leftNeighbor = getPerson(r, c - 1);
+            const rightNeighbor = getPerson(r, c + 1);
+
+            const prevHead = headPerson ? headPerson.history[step - 1] : null;
+            const prevLeft = leftNeighbor ? leftNeighbor.history[step - 1] : null;
+            const prev2Left = (leftNeighbor && step >= 2) ? leftNeighbor.history[step - 2] : null;
+
+            if (step === 1 || step === 2 || step === 3) {
+                p.moveNorth();
+                continue;
+            }
+
+            if (r === 1) {
+                if (c === 1 && step === 4) {
+                    p.stop();
+                    continue;
+                }
+
+                if (leftNeighbor && leftNeighbor.isStopped && prevLeft && prevLeft.isMoving) {
+                    if (c === n) {
+                        p.westCountDown = 1;
+                        p.moveNorth();
+                    } else {
+                        p.stopCountDown = 2;
+                        p.moveNorth(); 
+                    }
+                }
+                else if (rightNeighbor && step >= 2 && rightNeighbor.history[step - 2].direction === 'WEST' && rightNeighbor.westStepCount === 2) {
+                    p.moveWest(); 
+                }
+                else {
+                    const prevSelf = p.history[step - 1];
+                    if (prevSelf) {
+                        if (prevSelf.direction === 'NORTH') {
+                            p.isStopped = false;
+                            p.moveNorth();
+                        } else if (prevSelf.direction === 'WEST') {
+                            p.isStopped = false;
+                            p.moveWest();
+                        } else {
+                            p.stop();
+                        }
+                    }
+                }
+            } else {
+                if (getPerson(1, c).isStopped === true) {
+                    p.stop();
+                } else if (headPerson && prevHead && headPerson.westStepCount >= 1 && prevHead.westStepCount < 1) {
+                    p.westCountDown = (r - 1) * 2;
+                    p.moveNorth();
+                } else {
+                    const prevSelf = p.history[step - 1];
+                    if (prevSelf) {
+                        if (prevSelf.direction === 'NORTH') {
+                            p.isStopped = false;
+                            p.moveNorth();
+                        } else if (prevSelf.direction === 'WEST') {
+                            p.isStopped = false;
+                            p.moveWest();
+                        } else {
+                            p.stop();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    people.forEach(p => p.recordHistory());
+  }
+}
+
+function runDefaultLogic() {
+  people = [];
+  let id = 0;
+  for (let r = 0; r < m; r++) {
+    for (let c = 0; c < n; c++) {
+      people.push({
+        id: `${r}-${c}`,
+        xIdx: r + 1,
+        yIdx: c + 1,
+        history: [{ x: c * 2, y: r * 2, angle: 0, isMoving: true, isStopped: false, direction: 'NORTH' }]
+      });
+    }
+  }
+  maxSteps = 15;
+  for (let s = 1; s <= maxSteps; s++) {
+    people.forEach(p => {
+      p.history.push({ x: (p.yIdx - 1) * 2, y: (p.xIdx - 1) * 2 - s, angle: 0, isMoving: true, isStopped: false, direction: 'NORTH' });
+    });
+  }
+}
+
+function render(isInitialBuild = false) {
+  const width = svg.clientWidth;
+  const height = svg.clientHeight;
+
+  if (width === 0 || height === 0) return;
+
+  const shortSide = Math.min(width, height);
+  const targetSubwayLength = shortSide * 0.45;
+
+  const maxInitialX = n * 2;
+  const maxInitialY = m * 2;
+  const initialSpan = Math.max(maxInitialX, maxInitialY);
+  
+  const cellSize = targetSubwayLength / (initialSpan > 0 ? initialSpan : 1);
+  const radius = Math.max(10, cellSize * 0.45);
+
+  // 🌟 [수정사항 1 반영] (1, 1)의 초기 매핑 위치(x:2, y:2)가 
+  // 메인 화면 한가운데(width/2, height/2)에서 정확히 '아래로 1보(cellSize)' 떨어진 좌표가 되도록 카메라 계산식을 하드 튜닝
+  const originX = (width / 2) - (2 * cellSize);
+  const originY = (height / 2) - (1 * cellSize); // Y축을 기준으로 원래 세팅(2*cellSize)보다 반 보 올려서 결국 (1,1)이 중앙 밑 1보에 걸치게 연산
+
+  if (isInitialBuild || svg.children.length === 0) {
+    svg.innerHTML = '';
+
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    defs.innerHTML = `
+      <filter id="glow-filter" x="-50%" y="-50%" width="200%" height="200%">
+        <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="var(--highlight-color)" flood-opacity="0.8"/>
+      </filter>
+    `;
+    svg.appendChild(defs);
+
+    people.forEach(p => {
+      const state = p.history[currentStep];
+      if (!state) return;
+      
+      const cx = originX + state.x * cellSize;
+      const cy = originY + state.y * cellSize;
+
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.setAttribute('id', `person-${p.id}`);
+      g.setAttribute('class', 'person-group');
+      g.setAttribute('transform', `translate(${cx}, ${cy}) rotate(${state.angle})`);
+      g.style.cursor = 'pointer';
+      g.onclick = () => toggleHighlight(p.id);
+
+      const leftFoot = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      leftFoot.setAttribute('class', 'foot-path left-foot');
+      leftFoot.setAttribute('d', `M 0 ${-radius} A ${radius} ${radius} 0 0 0 0 ${radius} Z`);
+
+      const rightFoot = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      rightFoot.setAttribute('class', 'foot-path right-foot');
+      rightFoot.setAttribute('d', `M 0 ${-radius} A ${radius} ${radius} 0 0 1 0 ${radius} Z`);
+
+      const centerLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      centerLine.setAttribute('class', 'center-line');
+      centerLine.setAttribute('x1', '0');
+      centerLine.setAttribute('y1', -radius);
+      centerLine.setAttribute('x2', '0');
+      centerLine.setAttribute('y2', radius);
+      centerLine.setAttribute('stroke', '#020617');
+      centerLine.setAttribute('stroke-width', '1.5');
+
+      const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      const arrowSize = radius * 0.5;
+      arrow.setAttribute('class', 'arrow-path');
+      arrow.setAttribute('d', `M 0 ${-arrowSize} L ${-arrowSize*0.6} ${arrowSize*0.5} L 0 ${arrowSize*0.15} L ${arrowSize*0.6} ${arrowSize*0.5} Z`);
+
+      g.appendChild(leftFoot);
+      g.appendChild(rightFoot);
+      g.appendChild(centerLine);
+      g.appendChild(arrow);
+      svg.appendChild(g);
+    });
+  }
+
+  people.forEach(p => {
+    const g = document.getElementById(`person-${p.id}`);
+    if (!g) return;
+
+    const state = p.history[currentStep];
+    if (!state) return;
+
+    const cx = originX + state.x * cellSize;
+    const cy = originY + state.y * cellSize;
+
+    g.setAttribute('transform', `translate(${cx}, ${cy}) rotate(${state.angle})`);
+
+    const isHighlighted = (p.id === highlightedId);
+    const leftFoot = g.querySelector('.left-foot');
+    const rightFoot = g.querySelector('.right-foot');
+    const arrow = g.querySelector('.arrow-path');
+
+    let activeFoot = 'none';
+
+    if (currentStep > 0 && state.isMoving) {
+      activeFoot = (currentStep % 2 === 1) ? 'left' : 'right';
+    }
+
+    const baseColor = 'var(--accent-color)';
+    const footHighlightColor = 'var(--foot-highlight)';
+
+    leftFoot.setAttribute('fill', activeFoot === 'left' ? footHighlightColor : baseColor);
+    rightFoot.setAttribute('fill', activeFoot === 'right' ? footHighlightColor : baseColor);
+    arrow.setAttribute('fill', '#0f172a');
+
+    if (isHighlighted) {
+      leftFoot.setAttribute('stroke', 'var(--highlight-color)');
+      leftFoot.setAttribute('stroke-width', '3');
+      leftFoot.setAttribute('filter', 'url(#glow-filter)');
+      
+      rightFoot.setAttribute('stroke', 'var(--highlight-color)');
+      rightFoot.setAttribute('stroke-width', '3');
+      rightFoot.setAttribute('filter', 'url(#glow-filter)');
+    } else {
+      leftFoot.setAttribute('stroke', 'var(--border-color)');
+      leftFoot.setAttribute('stroke-width', '1');
+      leftFoot.removeAttribute('filter');
+      
+      rightFoot.setAttribute('stroke', 'var(--border-color)');
+      rightFoot.setAttribute('stroke-width', '1');
+      rightFoot.removeAttribute('filter');
+    }
+  });
+}
+
+function toggleHighlight(id) {
+  highlightedId = (highlightedId === id) ? null : id;
+  render(false);
+}
+
+function nextStep() {
+  if (currentStep < maxSteps) {
+    currentStep++;
+    updateStep();
+  } else {
+    stopPlay();
+  }
+}
+
+function prevStep() {
+  stopPlay();
+  if (currentStep > 0) {
+    currentStep--;
+    updateStep();
+  }
+}
+
+function resetSim() {
+  stopPlay();
+  buildSimulation();
+}
+
+function updateStep() {
+  document.getElementById('current-step').innerText = currentStep;
+  render(false);
+}
+
+function togglePlay() {
+  if (isPlaying) {
+    stopPlay();
+  } else {
+    startPlay();
+  }
+}
+
+function startPlay() {
+  if (currentStep >= maxSteps) {
+    currentStep = 0;
+    updateStep();
+  }
+  isPlaying = true;
+  const playBtn = document.getElementById('play-btn');
+  playBtn.innerText = '❚❚ 일시정지';
+  playBtn.classList.add('playing');
+
+  playInterval = setInterval(() => {
+    if (currentStep < maxSteps) {
+      nextStep();
+    } else {
+      stopPlay();
+    }
+  }, 500);
+}
+
+function stopPlay() {
+  isPlaying = false;
+  if (playInterval) {
+    clearInterval(playInterval);
+    playInterval = null;
+  }
+  const playBtn = document.getElementById('play-btn');
+  if (playBtn) {
+    playBtn.innerText = '▶ 재생';
+    playBtn.classList.remove('playing');
+  }
+}
+
+window.onload = init;
+</script>
+</body>
+</html>
