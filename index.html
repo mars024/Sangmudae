@@ -183,6 +183,10 @@ body {
   transition: fill 0.15s ease, stroke 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease;
 }
 
+#bg-landmarks {
+  transition: transform 0.3s linear;
+}
+
 @media (max-width: 600px) {
   .app-container {
     padding: 6px;
@@ -270,10 +274,12 @@ class Person {
     this.angle = 0;
     this.isMoving = true;
     this.direction = 'NORTH';
+    this.currentSpeed = 1; 
     this.isStopped = false;
     
     this.westStepCount = 0;
     this.northStepCount = 0; 
+    this.northWestStepCount = 0; 
     
     this.stopCountDown = -1; 
     this.westCountDown = -1;
@@ -287,39 +293,66 @@ class Person {
       isStopped: this.isStopped,
       westStepCount: this.westStepCount,
       northStepCount: this.northStepCount,
+      northWestStepCount: this.northWestStepCount, 
       stopCountDown: this.stopCountDown,
       westCountDown: this.westCountDown
     }];
   }
 
-  moveNorth() {
-    this.y -= 1; 
+  moveNorth(speed = 1) {
+    this.currentSpeed = speed;
+    this.y -= speed; 
     this.angle = 0;
     this.isMoving = true;
     this.isStopped = false;
     this.direction = 'NORTH';
-    this.northStepCount += 1; 
-    this.westStepCount = 0;   
+    this.northStepCount += speed; 
+    this.westStepCount = 0;
+    this.northWestStepCount = 0;
   }
 
-  moveWest() {
-    this.x -= 1; 
+  moveWest(speed = 1) {
+    this.currentSpeed = speed;
+    this.x -= speed; 
     this.angle = -90;
     this.isMoving = true;
     this.isStopped = false;
     this.direction = 'WEST';
-    this.westStepCount += 1;   
+    this.westStepCount += speed;   
     this.northStepCount = 0;  
+    this.northWestStepCount = 0;
     this.westCountDown = -1;
   }
 
+  moveNorthWest(speed = 1) {
+    this.currentSpeed = speed;
+    this.x -= speed;
+    this.y -= speed;
+    this.angle = -45; 
+    this.isMoving = true;
+    this.isStopped = false;
+    this.direction = 'NORTHWEST';
+    this.northWestStepCount += speed;
+    this.northStepCount = 0;
+    this.westStepCount = 0;
+  }
+
   stop() {
+    this.currentSpeed = 0;
     this.isMoving = false;
     this.direction = 'STOP';
     this.isStopped = true;
     this.westStepCount = 0;   
     this.northStepCount = 0;  
+    this.northWestStepCount = 0;
     this.stopCountDown = -1;  
+  }
+  
+  repeatLastCommand() {
+      if (this.direction === 'NORTH') this.moveNorth(this.currentSpeed);
+      else if (this.direction === 'WEST') this.moveWest(this.currentSpeed);
+      else if (this.direction === 'NORTHWEST') this.moveNorthWest(this.currentSpeed);
+      else if (this.direction === 'STOP') this.stop();
   }
 
   recordHistory() {
@@ -332,6 +365,7 @@ class Person {
       isStopped: this.isStopped,
       westStepCount: this.westStepCount,
       northStepCount: this.northStepCount,
+      northWestStepCount: this.northWestStepCount,
       stopCountDown: this.stopCountDown,
       westCountDown: this.westCountDown
     });
@@ -358,7 +392,7 @@ function buildSimulation() {
   if (currentMode === 1) {
     runLogicMode1();
   } else if (currentMode === 2) {
-    runLogicMode2(); // 🌟 이름 및 알고리즘 개편 연동
+    runLogicMode2(); 
   } else if (currentMode === 3) {
     runLogicMode3(); 
   }
@@ -371,20 +405,13 @@ function buildSimulation() {
 
 function runLogicMode1() {
   people = []; 
-  
   for (let r = 1; r <= m; r++) {
     for (let c = 1; c <= n; c++) {
-      const id = `${r}-${c}`;
-      const initX = c * 2;
-      const initY = r * 2;
-      people.push(new Person(id, r, c, initX, initY));
+      people.push(new Person(`${r}-${c}`, r, c, c * 2, r * 2));
     }
   }
 
-  const getPerson = (row, col) => {
-    return people.find(p => p.xIdx === row && p.yIdx === col);
-  };
-
+  const getPerson = (row, col) => people.find(p => p.xIdx === row && p.yIdx === col);
   maxSteps = 22;
   
   for (let step = 1; step <= maxSteps; step++) {
@@ -395,18 +422,12 @@ function runLogicMode1() {
 
             if (p.stopCountDown > 0) {
                 p.stopCountDown -= 1;
-                if (p.stopCountDown === 0) {
-                    p.stop(); 
-                    continue;
-                }
+                if (p.stopCountDown === 0) { p.stop(); continue; }
             }
-
             if (p.westCountDown > 0) {
                 p.westCountDown -= 1;
                 if(p.westCountDown === 0) {
-                    if (c === 4) {
-                        p.moveNorth();
-                    }
+                    if (c === 4) p.moveNorth();
                     p.moveWest();
                     continue;
                 }
@@ -418,89 +439,106 @@ function runLogicMode1() {
 
             const prevHead = headPerson ? headPerson.history[step - 1] : null;
             const prevLeft = leftNeighbor ? leftNeighbor.history[step - 1] : null;
-            const prev2Left = (leftNeighbor && step >= 2) ? leftNeighbor.history[step - 2] : null;
 
-            if (step === 1 || step === 2 || step === 3) {
-                p.moveNorth();
-                continue;
-            }
+            if (step <= 3) { p.moveNorth(); continue; }
 
             if (r === 1) {
-                if (c === 1 && step === 4) {
-                    p.stop();
-                    continue;
-                }
-
+                if (c === 1 && step === 4) { p.stop(); continue; }
                 if (leftNeighbor && leftNeighbor.isStopped && prevLeft && prevLeft.isMoving) {
-                    if (c === n) {
-                        p.westCountDown = 1;
-                        p.moveNorth();
-                    } else {
-                        p.stopCountDown = 2;
-                        p.moveNorth(); 
-                    }
+                    if (c === n) { p.westCountDown = 1; p.moveNorth(); } 
+                    else { p.stopCountDown = 2; p.moveNorth(); }
                 }
                 else if (rightNeighbor && step >= 2 && rightNeighbor.history[step - 2].direction === 'WEST' && rightNeighbor.westStepCount === 2) {
                     p.moveWest(); 
                 }
                 else {
                     const prevSelf = p.history[step - 1];
-                    if (prevSelf) {
-                        if (prevSelf.direction === 'NORTH') {
-                            p.isStopped = false;
-                            p.moveNorth();
-                        } else if (prevSelf.direction === 'WEST') {
-                            p.isStopped = false;
-                            p.moveWest();
-                        } else {
-                            p.stop();
-                        }
-                    }
+                    if (prevSelf) p.repeatLastCommand();
                 }
             } else {
-                if (getPerson(1, c).isStopped === true) {
-                    p.stop();
-                } else if (headPerson && prevHead && headPerson.westStepCount >= 1 && prevHead.westStepCount < 1) {
+                if (getPerson(1, c).isStopped === true) { p.stop(); } 
+                else if (headPerson && prevHead && headPerson.westStepCount >= 1 && prevHead.westStepCount < 1) {
                     p.westCountDown = (r - 1) * 2;
                     p.moveNorth();
                 } else {
                     const prevSelf = p.history[step - 1];
-                    if (prevSelf) {
-                        if (prevSelf.direction === 'NORTH') {
-                            p.isStopped = false;
-                            p.moveNorth();
-                        } else if (prevSelf.direction === 'WEST') {
-                            p.isStopped = false;
-                            p.moveWest();
-                        } else {
-                            p.stop();
-                        }
-                    }
+                    if (prevSelf) p.repeatLastCommand();
                 }
             }
         }
     }
-
     people.forEach(p => p.recordHistory());
   }
 }
 
-/* 🌟 [수정] 2번 알고리즘 개편: 규격을 1번/3번 모드와 완전히 맞추고 순수 전진 로직 적용 */
+// 🌟 2번 로직: 2스텝 지연 시작 엄수 + 평행사변형 보정
 function runLogicMode2() {
   people = [];
-  for (let r = 1; r <= m; r++) {
-    for (let c = 1; c <= n; c++) {
-      const id = `${r}-${c}`;
-      const initX = c * 2;
-      const initY = r * 2;
-      people.push(new Person(id, r, c, initX, initY));
+  for (let x = 1; x <= m; x++) { 
+    for (let y = 1; y <= n; y++) { 
+      people.push(new Person(`${x}-${y}`, x, y, y * 2, x * 2));
     }
   }
-  maxSteps = 22;
+  
+  maxSteps = 28; // 25스텝 정지 + 여유
+  const getPerson = (targetX, targetY) => people.find(p => p.xIdx === targetX && p.yIdx === targetY);
+
   for (let step = 1; step <= maxSteps; step++) {
+    
+    // 1. 공통 규칙: 직전 명령 반복 예약
     people.forEach(p => {
-      p.moveNorth(); // 기본 구조에 맞춘 직진 연산
-      p.recordHistory();
+        if (step === 1) {
+            p.nextCommand = 'NORTH';
+            p.nextSpeed = 1;
+        } else {
+            p.nextCommand = p.direction;
+            p.nextSpeed = p.currentSpeed;
+        }
+    });
+
+    for (let x = 1; x <= m; x++) {
+      let delay = (x - 1) * 2;
+      let p1 = getPerson(x, 1);
+      let p2 = getPerson(x, 2);
+      let p3 = getPerson(x, 3);
+      let p4 = getPerson(x, 4);
+
+      // --- [회전 메소드: 시작 타이밍 2스텝 차이 엄수] ---
+      
+      // Col 1: 5스텝 시작 (북서진 없이 서진)
+      if (step === 5 + delay) { p1.nextCommand = 'WEST'; p1.nextSpeed = 1; }
+
+      // Col 2: 7스텝 시작 (2스텝 북서진 후 서진)
+      if (step === 7 + delay) { p2.nextCommand = 'NORTHWEST'; p2.nextSpeed = 1; }
+      if (step === 9 + delay) { p2.nextCommand = 'WEST'; p2.nextSpeed = 1; }
+
+      // Col 3: 9스텝 시작 (간격 동일화를 위해 4스텝 북서진 후 서진)
+      if (step === 9 + delay) { p3.nextCommand = 'NORTHWEST'; p3.nextSpeed = 1; }
+      if (step === 13 + delay) { p3.nextCommand = 'WEST'; p3.nextSpeed = 1; }
+
+      // Col 4: 11스텝 시작 (간격 동일화를 위해 6스텝 북서진 후 서진)
+      if (step === 11 + delay) { p4.nextCommand = 'NORTHWEST'; p4.nextSpeed = 1; }
+      if (step === 17 + delay) { p4.nextCommand = 'WEST'; p4.nextSpeed = 1; }
+    }
+
+    // --- [정지 메소드] ---
+    // 마지막 인원 (4,4)가 서진을 시작하는 스텝 = 11(Col4시작) + 6(Row4지연) + 6(NW지속) = 23스텝
+    // 전원 서쪽 전환 완료(23스텝)로부터 2스텝 뒤인 25스텝에 전원 동시 정지
+    if (step === 25) {
+        people.forEach(p => {
+            p.nextCommand = 'STOP';
+            p.nextSpeed = 0;
+        });
+    }
+
+    // 3. 덮어씌워진 최종 명령 실행
+    people.forEach(p => {
+        if (p.nextCommand === 'NORTH') p.moveNorth(p.nextSpeed);
+        else if (p.nextCommand === 'WEST') p.moveWest(p.nextSpeed);
+        else if (p.nextCommand === 'NORTHWEST') p.moveNorthWest(p.nextSpeed);
+        else if (p.nextCommand === 'STOP') p.stop();
+        
+        p.recordHistory();
     });
   }
 }
@@ -509,10 +547,7 @@ function runLogicMode3() {
   people = []; 
   for (let r = 1; r <= m; r++) {
     for (let c = 1; c <= n; c++) {
-      const id = `${r}-${c}`;
-      const initX = c * 2;
-      const initY = r * 2;
-      people.push(new Person(id, r, c, initX, initY));
+      people.push(new Person(`${r}-${c}`, r, c, c * 2, r * 2));
     }
   }
   maxSteps = 22;
@@ -529,20 +564,39 @@ function render(isInitialBuild = false) {
 
   const shortSide = Math.min(width, height);
   const targetSubwayLength = shortSide * 0.45;
-
-  const maxInitialX = n * 2;
-  const maxInitialY = m * 2;
-  const initialSpan = Math.max(maxInitialX, maxInitialY);
+  const initialSpan = Math.max(n * 2, m * 2);
   
   const cellSize = targetSubwayLength / (initialSpan > 0 ? initialSpan : 1);
   const radius = cellSize * 0.45; 
 
-  const originX = (width / 2) - (2 * cellSize);
-  const originY = (height / 2) - (1 * cellSize);
+  let cameraOffsetX = 0;
+  let cameraOffsetY = 0;
+  
+  if (currentMode === 2 && highlightedId) {
+    const hp = people.find(p => p.id === highlightedId);
+    if (hp) {
+      let westStartStep = -1;
+      for (let i = 0; i <= currentStep; i++) {
+        if (hp.history[i] && hp.history[i].direction === 'WEST') {
+          westStartStep = i;
+          break;
+        }
+      }
+      
+      if (westStartStep !== -1 && currentStep >= westStartStep) {
+        const startState = hp.history[westStartStep];
+        const currState = hp.history[currentStep];
+        cameraOffsetX = (startState.x - currState.x) * cellSize;
+        cameraOffsetY = (startState.y - currState.y) * cellSize;
+      }
+    }
+  }
+
+  const originX = (width / 2) - (2 * cellSize) + cameraOffsetX;
+  const originY = (height / 2) - (1 * cellSize) + cameraOffsetY;
 
   if (isInitialBuild || svg.children.length === 0) {
     svg.innerHTML = '';
-
     const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
     defs.innerHTML = `
       <filter id="glow-filter" x="-50%" y="-50%" width="200%" height="200%">
@@ -574,13 +628,10 @@ function render(isInitialBuild = false) {
 
       const leftFoot = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       leftFoot.setAttribute('class', 'foot-path left-foot');
-
       const rightFoot = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       rightFoot.setAttribute('class', 'foot-path right-foot');
-
       const centerLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       centerLine.setAttribute('class', 'center-line');
-
       const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       arrow.setAttribute('class', 'arrow-path');
 
@@ -606,9 +657,8 @@ function render(isInitialBuild = false) {
     landmarksGroup.innerHTML = `
       <polygon points="${cellSize * 3},${-cellSize * 6} ${cellSize * 45},${-cellSize * 45} ${cellSize * 62},${cellSize * 35}" 
                fill="rgba(56, 189, 248, 0.08)" stroke="rgba(56, 189, 248, 0.35)" stroke-width="2.5" stroke-dasharray="6 6"/>
-
-      <rect x="${-cellSize * 45}" y="${cellSize * 4}" width="${cellSize * 46}" height="${cellSize * 42}" 
-            transform="rotate(15, ${-cellSize * 22}, ${cellSize * 25})"
+      <rect x="${-cellSize * 45}" y="${cellSize * 4}" width="${cellSize * 45}" height="${cellSize * 42}" 
+            transform="rotate(30, ${-cellSize * 22}, ${cellSize * 25})"
             fill="rgba(245, 158, 11, 0.08)" stroke="rgba(245, 158, 11, 0.35)" stroke-width="2.5" stroke-dasharray="5 5"/>
     `;
   }
@@ -616,13 +666,11 @@ function render(isInitialBuild = false) {
   people.forEach(p => {
     const g = document.getElementById(`person-${p.id}`);
     if (!g) return;
-
     const state = p.history[currentStep];
     if (!state) return;
 
     const cx = originX + state.x * cellSize;
     const cy = originY + state.y * cellSize;
-
     g.setAttribute('transform', `translate(${cx}, ${cy}) rotate(${state.angle})`);
 
     const isHighlighted = (p.id === highlightedId);
@@ -646,18 +694,12 @@ function render(isInitialBuild = false) {
 
     let activeFoot = 'none';
     if (currentStep > 0) {
-      if (state.isMoving) {
-        activeFoot = (currentStep % 2 === 1) ? 'left' : 'right';
-      } else {
-        if (currentStep % 2 === 1) {
-          activeFoot = 'left';
-        }
-      }
+      if (state.isMoving) activeFoot = (currentStep % 2 === 1) ? 'left' : 'right';
+      else if (currentStep % 2 === 1) activeFoot = 'left';
     }
 
     const baseColor = 'var(--color-accent)';
     const footHighlightColor = 'var(--color-new)';
-
     leftFoot.setAttribute('fill', activeFoot === 'left' ? footHighlightColor : baseColor);
     rightFoot.setAttribute('fill', activeFoot === 'right' ? footHighlightColor : baseColor);
     arrow.setAttribute('fill', 'var(--color-surface)');
@@ -668,7 +710,6 @@ function render(isInitialBuild = false) {
       leftFoot.setAttribute('stroke', 'var(--color-text)');
       leftFoot.setAttribute('stroke-width', `${borderThickness * 3}`);
       leftFoot.setAttribute('filter', 'url(#glow-filter)');
-      
       rightFoot.setAttribute('stroke', 'var(--color-text)');
       rightFoot.setAttribute('stroke-width', `${borderThickness * 3}`);
       rightFoot.setAttribute('filter', 'url(#glow-filter)');
@@ -676,7 +717,6 @@ function render(isInitialBuild = false) {
       leftFoot.setAttribute('stroke', 'var(--color-surface)');
       leftFoot.setAttribute('stroke-width', `${borderThickness}`);
       leftFoot.removeAttribute('filter');
-      
       rightFoot.setAttribute('stroke', 'var(--color-surface)');
       rightFoot.setAttribute('stroke-width', `${borderThickness}`);
       rightFoot.removeAttribute('filter');
@@ -693,9 +733,7 @@ function nextStep() {
   if (currentStep < maxSteps) {
     currentStep++;
     updateStep();
-  } else {
-    stopPlay();
-  }
+  } else stopPlay();
 }
 
 function prevStep() {
@@ -706,54 +744,24 @@ function prevStep() {
   }
 }
 
-function resetSim() {
-  stopPlay();
-  buildSimulation();
-}
-
-function updateStep() {
-  document.getElementById('current-step').innerText = currentStep;
-  render(false);
-}
-
-function togglePlay() {
-  if (isPlaying) {
-    stopPlay();
-  } else {
-    startPlay();
-  }
-}
+function resetSim() { stopPlay(); buildSimulation(); }
+function updateStep() { document.getElementById('current-step').innerText = currentStep; render(false); }
+function togglePlay() { if (isPlaying) stopPlay(); else startPlay(); }
 
 function startPlay() {
-  if (currentStep >= maxSteps) {
-    currentStep = 0;
-    updateStep();
-  }
+  if (currentStep >= maxSteps) { currentStep = 0; updateStep(); }
   isPlaying = true;
   const playBtn = document.getElementById('play-btn');
   playBtn.innerText = '❚❚'; 
   playBtn.classList.add('playing');
-
-  playInterval = setInterval(() => {
-    if (currentStep < maxSteps) {
-      nextStep();
-    } else {
-      stopPlay();
-    }
-  }, 500);
+  playInterval = setInterval(() => { if (currentStep < maxSteps) nextStep(); else stopPlay(); }, 500);
 }
 
 function stopPlay() {
   isPlaying = false;
-  if (playInterval) {
-    clearInterval(playInterval);
-    playInterval = null;
-  }
+  if (playInterval) { clearInterval(playInterval); playInterval = null; }
   const playBtn = document.getElementById('play-btn');
-  if (playBtn) {
-    playBtn.innerText = '▶'; 
-    playBtn.classList.remove('playing');
-  }
+  if (playBtn) { playBtn.innerText = '▶'; playBtn.classList.remove('playing'); }
 }
 
 window.onload = init;
