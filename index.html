@@ -6,11 +6,12 @@
 <title>행렬 좌회전 시뮬레이터</title>
 <style>
 :root {
-  --color-bg: #0f172a;       /* 1. 메인 어두운 배경색 */
-  --color-surface: #334155;  /* 2. 표면, 비활성 버튼, 화살표 기본색 */
-  --color-text: #f8fafc;     /* 3. 일반 텍스트, 하이라이트 윤곽선 */
-  --color-accent: #38bdf8;   /* 4. 핵심 강조색 (스카이 블루) - 발 기본색, 모드 활성색 */
-  --color-new: #f59e0b;      /* 5. 대비형 활성색 (오렌지/앰버) - 재생 버튼 기본색, 발 하이라이트 */
+  --color-bg: #0f172a;       
+  --color-surface: #334155;  
+  --color-text: #f8fafc;     
+  --color-accent: #38bdf8;   
+  --color-new: #f59e0b;      
+  --transition-duration: 0.3s;
 }
 
 * {
@@ -59,6 +60,7 @@ body {
   gap: 6px;
   background: rgba(15, 23, 42, 0.85);
   backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   padding: 6px 8px;
   border-radius: 10px;
   border: 1px solid var(--color-surface);
@@ -92,6 +94,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.2s ease;
 }
 
 .square-mode-btn.active {
@@ -114,19 +117,65 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   background: rgba(15, 23, 42, 0.85);
   backdrop-filter: blur(8px);
-  padding: 8px 16px;
+  -webkit-backdrop-filter: blur(8px);
+  padding: 12px 20px;
   border-radius: 16px;
   border: 1px solid var(--color-surface);
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+  width: 90%;
+  max-width: 360px;
+}
+
+.speed-control-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 10px;
+}
+.speed-label {
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--color-text);
+  opacity: 0.8;
+  white-space: nowrap;
+}
+.slider-wrapper {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+input[type=range] {
+  -webkit-appearance: none;
+  width: 100%;
+  background: transparent;
+  z-index: 2;
+  margin: 0;
+}
+input[type=range]:focus { outline: none; }
+input[type=range]::-webkit-slider-runnable-track {
+  width: 100%; height: 6px; cursor: pointer; background: var(--color-surface); border-radius: 3px;
+}
+input[type=range]::-webkit-slider-thumb {
+  height: 16px; width: 16px; border-radius: 50%; background: var(--color-accent);
+  cursor: pointer; -webkit-appearance: none; margin-top: -5px; box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+.slider-ticks {
+  position: absolute; width: 100%; height: 100%; pointer-events: none; top: 0; left: 0;
+}
+.tick-mark {
+  position: absolute; top: 50%; width: 2px; height: 10px; background-color: var(--color-text);
+  opacity: 0.4; transform: translate(-50%, -50%);
 }
 
 .step-controls {
   display: flex;
   justify-content: center;
-  gap: 8px;
+  gap: 12px;
+  width: 100%;
 }
 
 .btn-square {
@@ -137,8 +186,6 @@ body {
   color: var(--color-text);
   border: 1px solid var(--color-surface);
   border-radius: 10px;
-  font-size: 16px;
-  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -146,82 +193,103 @@ body {
   transition: all 0.2s ease;
 }
 
-.btn-square:active {
-  transform: scale(0.92);
-}
+.btn-square:active:not(:disabled) { transform: scale(0.92); }
+.btn-square:disabled { opacity: 0.3; cursor: not-allowed; }
 
-.btn-square.btn-primary {
-  background-color: var(--color-accent);
-  color: var(--color-bg);
-  border: none;
-}
+.btn-square.btn-primary { background-color: var(--color-accent); color: var(--color-bg); border: none; }
+.btn-square.btn-play { background-color: var(--color-new); color: var(--color-bg); border: none; }
+.btn-square.btn-play.playing { background-color: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-surface); }
 
-.btn-square.btn-play {
-  background-color: var(--color-new);
-  color: var(--color-bg);
-  border: none;
+/* 중앙 종료 아이콘 버튼 */
+#end-message {
+  display: none;
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 15;
 }
-
-.btn-square.btn-play.playing {
-  background-color: var(--color-surface);
-  color: var(--color-text);
-  border: 1px solid var(--color-surface);
+#end-message button {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  padding: 0; display: flex; align-items: center; justify-content: center;
 }
 
 .step-indicator {
-  text-align: center;
-  font-size: 12px;
-  color: var(--color-text);
-  white-space: nowrap;
+  text-align: center; font-size: 13px; color: var(--color-text); white-space: nowrap;
 }
 
-#camera-group {
-  transition: transform 0.3s linear;
+#phase-info { 
+  font-size: 14px; font-weight: bold; color: var(--color-new); text-align: center;
 }
 
-.person-group {
-  transition: transform 0.3s linear;
+#camera-group, .person-group {
+  transform-origin: 0px 0px;
+  transition: transform var(--transition-duration) linear, -webkit-transform var(--transition-duration) linear;
+  will-change: transform;
 }
 
 .foot-path {
-  transition: fill 0.15s ease, stroke 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease;
+  transition: fill var(--transition-duration) ease, stroke var(--transition-duration) ease, stroke-width var(--transition-duration) ease, filter var(--transition-duration) ease;
+}
+
+/* 튜토리얼 오버레이 */
+#tutorial-overlay {
+  position: fixed; inset: 0;
+  z-index: 9999; display: none; cursor: pointer;
+}
+.tut-highlight {
+  position: absolute;
+  border: 3px solid var(--color-accent);
+  border-radius: 16px;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.75); 
+  pointer-events: none;
+  transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  background: transparent;
+}
+.tut-tooltip {
+  position: absolute; background: white; color: #1e293b; padding: 16px;
+  border-radius: 12px; width: 260px; font-size: 14px; font-weight: 600;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3); pointer-events: none;
+  transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); z-index: 10001;
+}
+.tut-hint {
+  font-size: 11px; font-weight: normal; color: #64748b; margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 8px;
+}
+.tut-close-btn {
+  position: absolute; top: 20px; left: 20px; background: rgba(255,255,255,0.2);
+  color: white; border: none; padding: 8px 16px; border-radius: 20px;
+  font-weight: bold; cursor: pointer; z-index: 10002; backdrop-filter: blur(4px);
 }
 
 @media (max-width: 600px) {
-  .app-container {
-    padding: 6px;
-  }
-  .simulation-wrapper {
-    border-radius: 12px;
-  }
-  .controls-overlay {
-    bottom: 10px;
-  }
-  .btn-square {
-    width: 40px;
-    height: 40px;
-    font-size: 14px;
-  }
-  .mode-overlay {
-    top: 8px;
-    right: 8px;
-    padding: 4px 6px;
-  }
-  .square-mode-btn {
-    width: 32px;
-    height: 32px;
-    font-size: 13px;
-  }
-  .mode-title {
-    font-size: 10px;
-  }
+  .app-container { padding: 6px; }
+  .simulation-wrapper { border-radius: 12px; }
+  .controls-overlay { bottom: 10px; width: 95%; padding: 10px 12px; }
+  .btn-square { width: 40px; height: 40px; }
+  .mode-overlay { top: 8px; right: 8px; padding: 4px 6px; }
+  .square-mode-btn { width: 32px; height: 32px; font-size: 13px; }
 }
 </style>
 </head>
 <body>
 
+<div id="tutorial-overlay" onclick="nextTutorialStep()">
+  <button class="tut-close-btn" onclick="closeTutorial(event)">건너뛰기 ✕</button>
+  <div id="tut-highlight" class="tut-highlight"></div>
+  <div id="tut-tooltip" class="tut-tooltip">
+    <div id="tut-text"></div>
+    <div id="tut-hint" class="tut-hint">화면을 터치하면 다음으로 넘어갑니다.</div>
+  </div>
+</div>
+
 <div class="app-container">
   <div class="simulation-wrapper">
+    
+    <div class="help-btn-container" style="position: absolute; top: 12px; left: 12px; z-index: 10;">
+      <button class="square-mode-btn" onclick="startTutorial()" title="튜토리얼 다시 보기" style="background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--color-surface); color: var(--color-text);">?</button>
+    </div>
+
     <div class="mode-overlay">
       <div class="mode-title">회전 방식</div>
       <div class="mode-buttons-group">
@@ -233,16 +301,44 @@ body {
 
     <svg id="sim-canvas"></svg>
 
+    <div id="end-message">
+      <button class="btn-square btn-primary" onclick="resetSim()" title="초기화 및 다시 시작">
+        <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg> 
+      </button>
+    </div>
+
     <div class="controls-overlay">
-      <div class="step-indicator">
-        현재 스텝: <span id="current-step" style="color: var(--color-accent); font-weight: bold;">0</span> / <span id="total-steps">0</span>
+      <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 4px;">
+        <div id="phase-info">준비 완료</div>
+        <div class="step-indicator">스텝: <span id="current-step" style="color: var(--color-accent); font-weight: bold;">0</span> / <span id="total-steps">0</span></div>
+      </div>
+
+      <div class="speed-control-container">
+        <span class="speed-label">x0.5</span>
+        <div class="slider-wrapper">
+          <input type="range" id="speed-slider" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updateSpeed()">
+          <div class="slider-ticks">
+            <span class="tick-mark" style="left: 33.33%;"></span>
+            <span class="tick-mark" style="left: 66.66%;"></span>
+          </div>
+        </div>
+        <span class="speed-label">x2.0</span>
       </div>
 
       <div class="step-controls">
-        <button class="btn-square" onclick="resetSim()" title="초기화">↺</button>
-        <button class="btn-square btn-primary" onclick="prevStep()" title="이전 스텝">⏮</button>
-        <button class="btn-square btn-play" id="play-btn" onclick="togglePlay()" title="재생">▶</button>
-        <button class="btn-square btn-primary" onclick="nextStep()" title="다음 스텝">⏭</button>
+        <button class="btn-square" onclick="resetSim()" title="초기화">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+        </button>
+        <button class="btn-square btn-primary" id="prev-btn" onclick="prevStep()" title="이전 스텝" disabled>
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+        </button>
+        <button class="btn-square btn-play" id="play-btn" onclick="togglePlay()" title="재생">
+          <svg id="icon-play" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="icon-pause" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" style="display:none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        </button>
+        <button class="btn-square btn-primary" id="next-btn" onclick="nextStep()" title="다음 스텝">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+        </button>
       </div>
     </div>
   </div>
@@ -251,13 +347,14 @@ body {
 <script>
 let m = 4; 
 let n = 4; 
-let currentMode = 1; /* 다시 1번 모드를 기본값으로 복원 */
+let currentMode = 1; 
 let currentStep = 0;
 let maxSteps = 22;
 let highlightedId = null;
 
 let isPlaying = false;
 let playInterval = null;
+let playbackSpeed = 1.0; 
 
 let people = [];
 
@@ -335,6 +432,19 @@ class Person {
     this.northStepCount = 0;
     this.westStepCount = 0;
   }
+  
+  arc(pivotX, pivotY, radius, progress) {
+    const startAngle = 0; 
+    const endAngle = -Math.PI / 2; 
+    const currentAngle = startAngle + (endAngle - startAngle) * progress;
+
+    this.x = pivotX + radius * Math.cos(currentAngle);
+    this.y = pivotY + radius * Math.sin(currentAngle);
+    this.angle = currentAngle * (180 / Math.PI); 
+    this.isMoving = true; 
+    this.isStopped = false;
+    this.direction = 'ARC';
+  }
 
   stop() {
     this.currentSpeed = 0;
@@ -373,6 +483,27 @@ class Person {
 function init() {
   buildSimulation();
   window.addEventListener('resize', () => render(false));
+  
+  setTimeout(() => {
+    try {
+      if (!localStorage.getItem('tutorialSeen')) {
+        startTutorial();
+      }
+    } catch (e) {
+      startTutorial();
+    }
+  }, 500);
+}
+
+function updateSpeed() {
+  playbackSpeed = parseFloat(document.getElementById('speed-slider').value);
+  const transitionTime = 0.3 / playbackSpeed;
+  document.documentElement.style.setProperty('--transition-duration', `${transitionTime}s`);
+  
+  if (isPlaying) {
+      clearInterval(playInterval);
+      playInterval = setInterval(() => { if (currentStep < maxSteps) nextStep(); else stopPlay(); }, 500 / playbackSpeed);
+  }
 }
 
 function setMode(mode) {
@@ -387,18 +518,48 @@ function buildSimulation() {
   stopPlay();
   currentStep = 0;
 
-  if (currentMode === 1) {
-    runLogicMode1();
-  } else if (currentMode === 2) {
-    runLogicMode2(); 
-  } else if (currentMode === 3) {
-    runLogicMode3(); 
-  }
+  if (currentMode === 1) runLogicMode1();
+  else if (currentMode === 2) runLogicMode2(); 
+  else if (currentMode === 3) runLogicMode3(); 
 
   document.getElementById('total-steps').innerText = maxSteps;
-  document.getElementById('current-step').innerText = currentStep;
-
+  updateStatusText();
   render(true);
+}
+
+function updateStatusText() {
+  document.getElementById('current-step').innerText = currentStep;
+  document.getElementById('prev-btn').disabled = (currentStep === 0);
+  document.getElementById('next-btn').disabled = (currentStep === maxSteps);
+
+  const endMessage = document.getElementById('end-message');
+  if (currentStep === maxSteps) endMessage.style.display = 'block';
+  else endMessage.style.display = 'none';
+
+  let phase = "";
+  if (currentMode === 1) {
+      if (currentStep === 0) phase = "준비 완료";
+      else if (currentStep <= 3) phase = "전진 중";
+      else if (currentStep <= 20) phase = "회전 중";
+      else if (currentStep === 21) phase = "회전 완료";
+      else phase = "시뮬레이션 종료";
+  } else if (currentMode === 2) {
+      if (currentStep === 0) phase = "준비 완료";
+      else if (currentStep <= 4) phase = "전진 중";
+      else if (currentStep <= 25) phase = "회전 중";
+      else if (currentStep <= 28) phase = "회전 완료";
+      else if (currentStep <= 31) phase = "전진 중";
+      else phase = "시뮬레이션 종료";
+  } else if (currentMode === 3) {
+      // 🌟 42스텝에 회전 완료 표시, 43스텝부터 다시 전진 중 표시
+      if (currentStep === 0) phase = "준비 완료";
+      else if (currentStep <= 4) phase = "전진 중";
+      else if (currentStep <= 41) phase = "회전 중";
+      else if (currentStep === 42) phase = "회전 완료";
+      else if (currentStep <= 45) phase = "전진 중";
+      else phase = "시뮬레이션 종료";
+  }
+  document.getElementById('phase-info').innerText = phase;
 }
 
 function runLogicMode1() {
@@ -483,22 +644,16 @@ function runLogicMode2() {
     people.forEach(p => {
         let r = p.xIdx;
         let c = p.yIdx;
-
         let rowDelay = (r - 1) * 2;
         let myRotationStartStep = 4 + rowDelay;
 
         if (step < 20) {
-            if (step <= myRotationStartStep) {
-                p.moveNorth(1.0);
-            } else {
+            if (step <= myRotationStartStep) p.moveNorth(1.0);
+            else {
                 let t = step - myRotationStartStep;
                 let nwDuration = (c - 1) * 2; 
-                
-                if (t <= nwDuration) {
-                    p.moveNorthWest(1.0);
-                } else {
-                    p.moveWest(0.5); 
-                }
+                if (t <= nwDuration) p.moveNorthWest(1.0);
+                else p.moveWest(0.5); 
             }
         } 
         else if (step === 20) { p.stop(); }
@@ -523,37 +678,65 @@ function runLogicMode3() {
       people.push(new Person(`${r}-${c}`, r, c, c * 2, r * 2));
     }
   }
-  maxSteps = 22;
+  maxSteps = 46; 
+
   for (let step = 1; step <= maxSteps; step++) {
-    people.forEach(p => p.recordHistory());
+    people.forEach(p => {
+        let r = p.xIdx;
+        let c = p.yIdx;
+
+        let rotStart = 5 + (r - 1) * 10;
+        let rotEnd = rotStart + 7; 
+
+        if (step <= 4) {
+            p.moveNorth(1.0);
+        } 
+        else if (step >= 5 && step <= 44) {
+            if (step >= rotStart && step <= rotEnd) {
+                let progress = (step - rotStart + 1) / 8; 
+                let pivotX = 2; 
+                let pivotY = -2; 
+                let radius = (c - 1) * 2;
+                p.arc(pivotX, pivotY, radius, progress);
+            } 
+            else if (step < rotStart) {
+                let cycleStep = (step - 5) % 10;
+                if (cycleStep === 8 || cycleStep === 9) p.moveNorth(1.0);
+                else p.stop(); 
+            } 
+            else if (step > rotEnd) {
+                let cycleStep = (step - 5) % 10;
+                if (cycleStep === 8 || cycleStep === 9) p.moveWest(1.0);
+                else p.stop();
+            }
+        } 
+        else if (step === 45) { p.moveWest(1.0); } 
+        else { p.stop(); }
+
+        p.recordHistory();
+    });
   }
 }
 
 function render(isInitialBuild = false) {
   const width = svg.clientWidth;
   const height = svg.clientHeight;
-
   if (width === 0 || height === 0) return;
 
   const shortSide = Math.min(width, height);
   const targetSubwayLength = shortSide * 0.45;
   const initialSpan = Math.max(n * 2, m * 2);
-  
   const cellSize = targetSubwayLength / (initialSpan > 0 ? initialSpan : 1);
   const radius = cellSize * 0.45; 
 
   let baseOriginX = (width / 2) - (2 * cellSize);
   let baseOriginY = (height / 2) - (1 * cellSize);
 
-  // --- 카메라 트래킹 로직 (전체 대열 바운딩 박스 기준, 데드존 방식) ---
   let cameraOffsetX = 0;
   let cameraOffsetY = 0;
-
-  // '4/3 영역'은 '4분의 3 (75%)'의 의미로 해석하여 상하좌우 12.5% 마진 설정
   const marginX = width * 0.125;
   const marginY = height * 0.125;
 
-  // 0스텝부터 현재 스텝까지 카메라의 궤적을 시뮬레이션하여 일관된 오프셋 계산 (결정론적 이동)
   for (let i = 0; i <= currentStep; i++) {
     let stepMinX = Infinity, stepMaxX = -Infinity;
     let stepMinY = Infinity, stepMaxY = -Infinity;
@@ -568,18 +751,13 @@ function render(isInitialBuild = false) {
       }
     });
 
-    // 대열 전체의 크기가 화면 안전 구역보다 클 경우의 중앙 정렬 예외 처리
     if ((stepMaxX - stepMinX) > (width - marginX * 2)) {
        cameraOffsetX = (width / 2) - baseOriginX - ((stepMinX + stepMaxX) / 2);
     } else {
        let sMinX = baseOriginX + stepMinX + cameraOffsetX;
        let sMaxX = baseOriginX + stepMaxX + cameraOffsetX;
-       
-       if (sMinX < marginX) {
-           cameraOffsetX += (marginX - sMinX);
-       } else if (sMaxX > width - marginX) {
-           cameraOffsetX += ((width - marginX) - sMaxX);
-       }
+       if (sMinX < marginX) cameraOffsetX += (marginX - sMinX);
+       else if (sMaxX > width - marginX) cameraOffsetX += ((width - marginX) - sMaxX);
     }
 
     if ((stepMaxY - stepMinY) > (height - marginY * 2)) {
@@ -587,12 +765,8 @@ function render(isInitialBuild = false) {
     } else {
        let sMinY = baseOriginY + stepMinY + cameraOffsetY;
        let sMaxY = baseOriginY + stepMaxY + cameraOffsetY;
-       
-       if (sMinY < marginY) {
-           cameraOffsetY += (marginY - sMinY);
-       } else if (sMaxY > height - marginY) {
-           cameraOffsetY += ((height - marginY) - sMaxY);
-       }
+       if (sMinY < marginY) cameraOffsetY += (marginY - sMinY);
+       else if (sMaxY > height - marginY) cameraOffsetY += ((height - marginY) - sMaxY);
     }
   }
 
@@ -607,17 +781,15 @@ function render(isInitialBuild = false) {
         <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="var(--color-text)" flood-opacity="0.8"/>
       </filter>
       <pattern id="grid-pattern" patternUnits="userSpaceOnUse">
-        <circle cx="0" cy="0" r="2.5" fill="var(--color-accent)" opacity="0.65"/>
+        <circle cx="0" cy="0" r="2.5" fill="var(--color-accent)" opacity="0.43"/>
       </pattern>
     `;
     svg.appendChild(defs);
 
-    // 카메라 그룹 생성: 배경과 모든 요소를 통째로 이동시켜 뚝뚝 끊기지 않는 부드러운 패닝 효과 구현
     const cameraGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     cameraGroup.setAttribute('id', 'camera-group');
     svg.appendChild(cameraGroup);
 
-    // 넓은 배경 격자 생성 (무한한 바닥처럼 보이도록 크게 그림)
     const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     bgRect.setAttribute('id', 'sim-bg-grid');
     bgRect.setAttribute('x', '-5000');
@@ -655,13 +827,12 @@ function render(isInitialBuild = false) {
     });
   }
 
-  // 카메라 그룹 위치 업데이트 (CSS transition을 통해 부드럽게 이동됨)
   const cameraGroup = svg.querySelector('#camera-group');
   if (cameraGroup) {
-    cameraGroup.setAttribute('transform', `translate(${originX}, ${originY})`);
+    cameraGroup.style.transform = `translate(${originX}px, ${originY}px)`;
+    cameraGroup.style.webkitTransform = `translate(${originX}px, ${originY}px)`;
   }
 
-  // 패턴의 시작 좌표를 0,0으로 고정하여 격자 무늬가 끊어지지 않도록 수정
   const gridPattern = svg.querySelector('#grid-pattern');
   if (gridPattern) {
     gridPattern.setAttribute('width', cellSize);
@@ -696,10 +867,11 @@ function render(isInitialBuild = false) {
     const state = p.history[currentStep];
     if (!state) return;
 
-    // 인원들의 렌더링 위치는 카메라 그룹 내부 좌표(cx, cy)만을 사용
     const cx = state.x * cellSize;
     const cy = state.y * cellSize;
-    g.setAttribute('transform', `translate(${cx}, ${cy}) rotate(${state.angle})`);
+    
+    g.style.transform = `translate(${cx}px, ${cy}px) rotate(${state.angle}deg)`;
+    g.style.webkitTransform = `translate(${cx}px, ${cy}px) rotate(${state.angle}deg)`;
 
     const isHighlighted = (p.id === highlightedId);
     const leftFoot = g.querySelector('.left-foot');
@@ -721,9 +893,8 @@ function render(isInitialBuild = false) {
     arrow.setAttribute('d', `M 0 ${-arrowSize} L ${-arrowSize*0.6} ${arrowSize*0.5} L 0 ${arrowSize*0.15} L ${arrowSize*0.6} ${arrowSize*0.5} Z`);
 
     let activeFoot = 'none';
-    if (currentStep > 0) {
-      if (state.isMoving) activeFoot = (currentStep % 2 === 1) ? 'left' : 'right';
-      else if (currentStep % 2 === 1) activeFoot = 'left';
+    if (currentStep > 0 && state.isMoving) {
+      activeFoot = (currentStep % 2 === 1) ? 'left' : 'right';
     }
 
     const baseColor = 'var(--color-accent)';
@@ -773,23 +944,132 @@ function prevStep() {
 }
 
 function resetSim() { stopPlay(); buildSimulation(); }
-function updateStep() { document.getElementById('current-step').innerText = currentStep; render(false); }
+function updateStep() { 
+  document.getElementById('current-step').innerText = currentStep; 
+  updateStatusText();
+  render(false); 
+}
 function togglePlay() { if (isPlaying) stopPlay(); else startPlay(); }
 
 function startPlay() {
   if (currentStep >= maxSteps) { currentStep = 0; updateStep(); }
   isPlaying = true;
-  const playBtn = document.getElementById('play-btn');
-  playBtn.innerText = '❚❚'; 
-  playBtn.classList.add('playing');
-  playInterval = setInterval(() => { if (currentStep < maxSteps) nextStep(); else stopPlay(); }, 500);
+  document.getElementById('icon-play').style.display = 'none';
+  document.getElementById('icon-pause').style.display = 'block';
+  document.getElementById('play-btn').classList.add('playing');
+  playInterval = setInterval(() => { if (currentStep < maxSteps) nextStep(); else stopPlay(); }, 500 / playbackSpeed);
 }
 
 function stopPlay() {
   isPlaying = false;
   if (playInterval) { clearInterval(playInterval); playInterval = null; }
-  const playBtn = document.getElementById('play-btn');
-  if (playBtn) { playBtn.innerText = '▶'; playBtn.classList.remove('playing'); }
+  document.getElementById('icon-play').style.display = 'block';
+  document.getElementById('icon-pause').style.display = 'none';
+  document.getElementById('play-btn').classList.remove('playing');
+}
+
+/* 튜토리얼 로직 */
+let currentTutStep = 0;
+const tutSteps = [
+  { target: '.controls-overlay', text: "시뮬레이션 조작부입니다. 스텝 이동, 재생 및 초기화를 제어할 수 있습니다.", align: 'top', padding: 5 },
+  { target: '.speed-control-container', text: "재생 속도를 0.5배속에서 2.0배속까지 세밀하게 조절할 수 있습니다.", align: 'top', padding: 5 },
+  { target: 'PEOPLE_BBOX', text: "사람을 클릭하면 포커스 기능이 활성화되어, 집중해서 보고 싶은 사람을 시각적으로 강조해 줍니다.", align: 'top', padding: 20 },
+  { target: '.mode-overlay', text: "회전 방식을 선택할 수 있습니다. 1, 2, 3번 모드를 지원합니다.", align: 'bottom', padding: 5 } 
+];
+
+function startTutorial() {
+  document.getElementById('tutorial-overlay').style.display = 'block';
+  currentTutStep = 0;
+  setTimeout(showTutorialStep, 50);
+}
+
+function nextTutorialStep() {
+  currentTutStep++;
+  if (currentTutStep >= tutSteps.length) {
+    closeTutorial(new Event('click'));
+  } else {
+    showTutorialStep();
+  }
+}
+
+function closeTutorial(e) {
+  e.stopPropagation();
+  document.getElementById('tutorial-overlay').style.display = 'none';
+  try { localStorage.setItem('tutorialSeen', 'true'); } catch(err) {}
+}
+
+function showTutorialStep() {
+  const stepInfo = tutSteps[currentTutStep];
+  let targetEl, rect;
+  const padding = stepInfo.padding !== undefined ? stepInfo.padding : 10;
+  
+  if (stepInfo.target === 'PEOPLE_BBOX') {
+    const groups = document.querySelectorAll('.person-group');
+    if (groups.length > 0) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        groups.forEach(g => {
+            const bbox = g.getBoundingClientRect();
+            if(bbox.left < minX) minX = bbox.left;
+            if(bbox.top < minY) minY = bbox.top;
+            if(bbox.right > maxX) maxX = bbox.right;
+            if(bbox.bottom > maxY) maxY = bbox.bottom;
+        });
+        rect = { left: minX, top: minY, width: maxX - minX, height: maxY - minY };
+    } else {
+        targetEl = document.querySelector('#sim-canvas');
+        rect = targetEl.getBoundingClientRect();
+    }
+  } else {
+    targetEl = document.querySelector(stepInfo.target);
+    if (!targetEl) return nextTutorialStep();
+    rect = targetEl.getBoundingClientRect();
+  }
+
+  const hl = document.getElementById('tut-highlight');
+  hl.style.left = (rect.left - padding) + 'px';
+  hl.style.top = (rect.top - padding) + 'px';
+  hl.style.width = (rect.width + padding*2) + 'px';
+  hl.style.height = (rect.height + padding*2) + 'px';
+
+  const tooltip = document.getElementById('tut-tooltip');
+  document.getElementById('tut-text').innerText = stepInfo.text;
+  
+  const hintEl = document.getElementById('tut-hint');
+  if (currentTutStep === tutSteps.length - 1) {
+      hintEl.innerText = "화면을 터치하면 안내가 종료됩니다.";
+  } else {
+      hintEl.innerText = "화면을 터치하면 다음으로 넘어갑니다.";
+  }
+  
+  tooltip.style.visibility = 'hidden';
+  tooltip.style.display = 'block';
+  
+  const tooltipRect = tooltip.getBoundingClientRect();
+  let tTop, tLeft;
+  
+  if (stepInfo.align === 'top') {
+    tTop = rect.top - tooltipRect.height - 15 - padding;
+    tLeft = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+  } else if (stepInfo.align === 'bottom') {
+    tTop = rect.top + rect.height + 15 + padding;
+    tLeft = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+  } else if (stepInfo.align === 'left') {
+    tTop = rect.top + (rect.height / 2) - (tooltipRect.height / 2);
+    tLeft = rect.left - tooltipRect.width - 15 - padding;
+  } else {
+    tTop = rect.top + (rect.height / 2) - (tooltipRect.height / 2);
+    tLeft = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+  }
+
+  const margin = 15;
+  if (tLeft < margin) tLeft = margin;
+  if (tLeft + tooltipRect.width > window.innerWidth - margin) tLeft = window.innerWidth - tooltipRect.width - margin;
+  if (tTop < margin) tTop = margin;
+  if (tTop + tooltipRect.height > window.innerHeight - margin) tTop = window.innerHeight - tooltipRect.height - margin;
+
+  tooltip.style.top = tTop + 'px';
+  tooltip.style.left = tLeft + 'px';
+  tooltip.style.visibility = 'visible';
 }
 
 window.onload = init;
