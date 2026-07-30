@@ -175,7 +175,6 @@ body {
   white-space: nowrap;
 }
 
-/* 카메라 추적 시 모든 요소를 부드럽게 이동시키기 위한 그룹 전환 효과 */
 #camera-group {
   transition: transform 0.3s linear;
 }
@@ -252,7 +251,7 @@ body {
 <script>
 let m = 4; 
 let n = 4; 
-let currentMode = 1; /* 1번 모드로 초기값 복원 */
+let currentMode = 1; /* 다시 1번 모드를 기본값으로 복원 */
 let currentStep = 0;
 let maxSteps = 22;
 let highlightedId = null;
@@ -546,30 +545,54 @@ function render(isInitialBuild = false) {
   let baseOriginX = (width / 2) - (2 * cellSize);
   let baseOriginY = (height / 2) - (1 * cellSize);
 
+  // --- 카메라 트래킹 로직 (전체 대열 바운딩 박스 기준, 데드존 방식) ---
   let cameraOffsetX = 0;
   let cameraOffsetY = 0;
-  
-  if (highlightedId) {
-    const hp = people.find(p => p.id === highlightedId);
-    if (hp && hp.history[currentStep]) {
-      const currState = hp.history[currentStep];
-      
-      // X축 추적: 서진을 시작한 이후부터 작동
-      let westStartStep = -1;
-      for (let i = 0; i <= currentStep; i++) {
-        if (hp.history[i] && hp.history[i].direction === 'WEST') {
-          westStartStep = i;
-          break;
-        }
-      }
-      
-      if (westStartStep !== -1 && currentStep >= westStartStep) {
-        const startState = hp.history[westStartStep];
-        cameraOffsetX = (startState.x - currState.x) * cellSize;
-      }
 
-      // Y축 추적: 포커스된 인원을 화면의 상단 1/3 지점에 고정시킴
-      cameraOffsetY = (height / 3) - (baseOriginY + currState.y * cellSize);
+  // '4/3 영역'은 '4분의 3 (75%)'의 의미로 해석하여 상하좌우 12.5% 마진 설정
+  const marginX = width * 0.125;
+  const marginY = height * 0.125;
+
+  // 0스텝부터 현재 스텝까지 카메라의 궤적을 시뮬레이션하여 일관된 오프셋 계산 (결정론적 이동)
+  for (let i = 0; i <= currentStep; i++) {
+    let stepMinX = Infinity, stepMaxX = -Infinity;
+    let stepMinY = Infinity, stepMaxY = -Infinity;
+    
+    people.forEach(p => {
+      const state = p.history[i];
+      if (state) {
+        stepMinX = Math.min(stepMinX, state.x * cellSize);
+        stepMaxX = Math.max(stepMaxX, state.x * cellSize);
+        stepMinY = Math.min(stepMinY, state.y * cellSize);
+        stepMaxY = Math.max(stepMaxY, state.y * cellSize);
+      }
+    });
+
+    // 대열 전체의 크기가 화면 안전 구역보다 클 경우의 중앙 정렬 예외 처리
+    if ((stepMaxX - stepMinX) > (width - marginX * 2)) {
+       cameraOffsetX = (width / 2) - baseOriginX - ((stepMinX + stepMaxX) / 2);
+    } else {
+       let sMinX = baseOriginX + stepMinX + cameraOffsetX;
+       let sMaxX = baseOriginX + stepMaxX + cameraOffsetX;
+       
+       if (sMinX < marginX) {
+           cameraOffsetX += (marginX - sMinX);
+       } else if (sMaxX > width - marginX) {
+           cameraOffsetX += ((width - marginX) - sMaxX);
+       }
+    }
+
+    if ((stepMaxY - stepMinY) > (height - marginY * 2)) {
+       cameraOffsetY = (height / 2) - baseOriginY - ((stepMinY + stepMaxY) / 2);
+    } else {
+       let sMinY = baseOriginY + stepMinY + cameraOffsetY;
+       let sMaxY = baseOriginY + stepMaxY + cameraOffsetY;
+       
+       if (sMinY < marginY) {
+           cameraOffsetY += (marginY - sMinY);
+       } else if (sMaxY > height - marginY) {
+           cameraOffsetY += ((height - marginY) - sMaxY);
+       }
     }
   }
 
@@ -589,12 +612,12 @@ function render(isInitialBuild = false) {
     `;
     svg.appendChild(defs);
 
-    // 카메라 그룹 생성: 배경과 모든 요소를 통째로 이동시켜 부드러운 패닝 효과 구현
+    // 카메라 그룹 생성: 배경과 모든 요소를 통째로 이동시켜 뚝뚝 끊기지 않는 부드러운 패닝 효과 구현
     const cameraGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     cameraGroup.setAttribute('id', 'camera-group');
     svg.appendChild(cameraGroup);
 
-    // 넓은 배경 격자 생성
+    // 넓은 배경 격자 생성 (무한한 바닥처럼 보이도록 크게 그림)
     const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     bgRect.setAttribute('id', 'sim-bg-grid');
     bgRect.setAttribute('x', '-5000');
@@ -632,12 +655,13 @@ function render(isInitialBuild = false) {
     });
   }
 
-  // 카메라 그룹 위치 업데이트 (CSS transition으로 부드럽게 이동)
+  // 카메라 그룹 위치 업데이트 (CSS transition을 통해 부드럽게 이동됨)
   const cameraGroup = svg.querySelector('#camera-group');
   if (cameraGroup) {
     cameraGroup.setAttribute('transform', `translate(${originX}, ${originY})`);
   }
 
+  // 패턴의 시작 좌표를 0,0으로 고정하여 격자 무늬가 끊어지지 않도록 수정
   const gridPattern = svg.querySelector('#grid-pattern');
   if (gridPattern) {
     gridPattern.setAttribute('width', cellSize);
@@ -649,11 +673,20 @@ function render(isInitialBuild = false) {
   const landmarksGroup = svg.querySelector('#bg-landmarks');
   if (landmarksGroup) {
     landmarksGroup.innerHTML = `
-      <polygon points="${cellSize * 3},${-cellSize * 6} ${cellSize * 45},${-cellSize * 45} ${cellSize * 62},${cellSize * 35}" 
-               fill="rgba(56, 189, 248, 0.08)" stroke="rgba(56, 189, 248, 0.35)" stroke-width="2.5" stroke-dasharray="6 6"/>
-      <rect x="${-cellSize * 45}" y="${cellSize * 4}" width="${cellSize * 45}" height="${cellSize * 42}" 
+      <polygon points="${cellSize * 3},${-cellSize * 6} 
+                       ${cellSize * 45},${-cellSize * 45} 
+                       ${cellSize * 62},${cellSize * 35}" 
+               fill="rgba(56, 189, 248, 0.08)" 
+               stroke="rgba(56, 189, 248, 0.35)" 
+               stroke-width="2.5" 
+               stroke-dasharray="6 6"/>
+      <rect x="${-cellSize * 45}" y="${cellSize * 4}" 
+            width="${cellSize * 45}" height="${cellSize * 42}" 
             transform="rotate(30, ${-cellSize * 22}, ${cellSize * 25})"
-            fill="rgba(245, 158, 11, 0.08)" stroke="rgba(245, 158, 11, 0.35)" stroke-width="2.5" stroke-dasharray="5 5"/>
+            fill="rgba(245, 158, 11, 0.08)" 
+            stroke="rgba(245, 158, 11, 0.35)" 
+            stroke-width="2.5" 
+            stroke-dasharray="5 5"/>
     `;
   }
 
@@ -663,7 +696,7 @@ function render(isInitialBuild = false) {
     const state = p.history[currentStep];
     if (!state) return;
 
-    // 인원들의 렌더링 위치는 카메라 그룹 내부 좌표를 기준으로 적용
+    // 인원들의 렌더링 위치는 카메라 그룹 내부 좌표(cx, cy)만을 사용
     const cx = state.x * cellSize;
     const cy = state.y * cellSize;
     g.setAttribute('transform', `translate(${cx}, ${cy}) rotate(${state.angle})`);
