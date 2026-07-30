@@ -5,12 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>행렬 좌회전 시뮬레이터</title>
 <style>
+/* 🌟 색약/색맹 접근성 배려 (Okabe-Ito 팔레트 기반 다크모드) */
 :root {
-  --color-bg: #0f172a;       
-  --color-surface: #334155;  
-  --color-text: #f8fafc;     
-  --color-accent: #38bdf8;   
-  --color-new: #f59e0b;      
+  --color-bg: #121212;         /* 딥 다크 그레이 (배경) */
+  --color-surface: #2d2d2d;    /* 표면, 비활성 버튼 */
+  --color-text: #f5f5f5;       /* 일반 텍스트 (명도 대비 확보) */
+  --color-idle: #737373;       /* 대기/비활성 시그널 */
+  
+  --color-accent: #56B4E9;     /* 스카이 블루 - 발 기본색, 모드 활성색 */
+  --color-new: #E69F00;        /* 오렌지 - 발 움직임, 플레이 버튼 */
+  
+  --color-rotate: #F0E442;     /* 옐로우 - 회전 시그널 */
+  --color-forward: #009E73;    /* 청록색(Bluish Green) - 전진 시그널 */
+  --color-stop: #D55E00;       /* 버밀리온(주황-적색) - 정지 시그널 */
+  
   --transition-duration: 0.3s;
 }
 
@@ -50,6 +58,78 @@ body {
   overflow: hidden;
 }
 
+.help-btn-container {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+}
+
+/* 🌟 신규: 사전 시그널 패널 UI */
+#signal-panel {
+  position: absolute;
+  top: 60px; 
+  left: 12px;
+  width: 110px;
+  background: rgba(45, 45, 45, 0.85); 
+  border: 2px solid var(--color-idle);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 10;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+}
+
+.signal-header {
+  font-size: 11px;
+  color: var(--color-text);
+  opacity: 0.8;
+  font-weight: bold;
+}
+
+#sig-icon-wrap {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#signal-name {
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.signal-bars {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  height: 6px;
+}
+
+.sig-bar {
+  flex: 1;
+  border-radius: 3px;
+  background: var(--color-idle);
+  transition: background 0.2s ease;
+}
+
+@keyframes panelBlink {
+  0% { box-shadow: 0 0 0px inset transparent, 0 0 0px transparent; }
+  50% { box-shadow: 0 0 15px inset currentColor, 0 0 15px currentColor; }
+  100% { box-shadow: 0 0 0px inset transparent, 0 0 0px transparent; }
+}
+
+.blink-anim {
+  animation: panelBlink 0.5s ease-in-out;
+}
+
 .mode-overlay {
   position: absolute;
   top: 12px;
@@ -58,7 +138,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  background: rgba(15, 23, 42, 0.85);
+  background: rgba(45, 45, 45, 0.85);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   padding: 6px 8px;
@@ -76,121 +156,46 @@ body {
   opacity: 0.8;
 }
 
-.mode-buttons-group {
-  display: flex;
-  gap: 6px;
-}
+.mode-buttons-group { display: flex; gap: 6px; }
 
 .square-mode-btn {
-  width: 36px;
-  height: 36px;
-  background: transparent;
-  border: none;
-  color: var(--color-surface);
-  font-size: 15px;
-  font-weight: bold;
-  border-radius: 6px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 36px; height: 36px; background: transparent; border: none;
+  color: var(--color-text); opacity: 0.6; font-size: 15px; font-weight: bold;
+  border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;
   transition: all 0.2s ease;
 }
 
 .square-mode-btn.active {
   background-color: var(--color-accent);
   color: var(--color-bg);
+  opacity: 1;
 }
 
-#sim-canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
+#sim-canvas { width: 100%; height: 100%; display: block; }
 
 .controls-overlay {
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  padding: 12px 20px;
-  border-radius: 16px;
-  border: 1px solid var(--color-surface);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
-  width: 90%;
-  max-width: 360px;
+  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 10;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  background: rgba(45, 45, 45, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  padding: 12px 20px; border-radius: 16px; border: 1px solid var(--color-surface);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5); width: 90%; max-width: 360px;
 }
 
-.speed-control-container {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  gap: 10px;
-}
-.speed-label {
-  font-size: 11px;
-  font-weight: bold;
-  color: var(--color-text);
-  opacity: 0.8;
-  white-space: nowrap;
-}
-.slider-wrapper {
-  flex: 1;
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-input[type=range] {
-  -webkit-appearance: none;
-  width: 100%;
-  background: transparent;
-  z-index: 2;
-  margin: 0;
-}
+.speed-control-container { display: flex; align-items: center; width: 100%; gap: 10px; }
+.speed-label { font-size: 11px; font-weight: bold; color: var(--color-text); opacity: 0.8; white-space: nowrap; }
+.slider-wrapper { flex: 1; position: relative; display: flex; align-items: center; }
+input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; z-index: 2; margin: 0; }
 input[type=range]:focus { outline: none; }
-input[type=range]::-webkit-slider-runnable-track {
-  width: 100%; height: 6px; cursor: pointer; background: var(--color-surface); border-radius: 3px;
-}
-input[type=range]::-webkit-slider-thumb {
-  height: 16px; width: 16px; border-radius: 50%; background: var(--color-accent);
-  cursor: pointer; -webkit-appearance: none; margin-top: -5px; box-shadow: 0 1px 3px rgba(0,0,0,0.5);
-}
-.slider-ticks {
-  position: absolute; width: 100%; height: 100%; pointer-events: none; top: 0; left: 0;
-}
-.tick-mark {
-  position: absolute; top: 50%; width: 2px; height: 10px; background-color: var(--color-text);
-  opacity: 0.4; transform: translate(-50%, -50%);
-}
+input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 6px; cursor: pointer; background: var(--color-surface); border-radius: 3px; }
+input[type=range]::-webkit-slider-thumb { height: 16px; width: 16px; border-radius: 50%; background: var(--color-accent); cursor: pointer; -webkit-appearance: none; margin-top: -5px; box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+.slider-ticks { position: absolute; width: 100%; height: 100%; pointer-events: none; top: 0; left: 0; }
+.tick-mark { position: absolute; top: 50%; width: 2px; height: 10px; background-color: var(--color-text); opacity: 0.4; transform: translate(-50%, -50%); }
 
-.step-controls {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  width: 100%;
-}
+.step-controls { display: flex; justify-content: center; gap: 12px; width: 100%; }
 
 .btn-square {
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  background-color: var(--color-surface);
-  color: var(--color-text);
-  border: 1px solid var(--color-surface);
-  border-radius: 10px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
+  width: 44px; height: 44px; padding: 0; background-color: var(--color-surface); color: var(--color-text);
+  border: 1px solid var(--color-surface); border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;
 }
 
 .btn-square:active:not(:disabled) { transform: scale(0.92); }
@@ -200,67 +205,21 @@ input[type=range]::-webkit-slider-thumb {
 .btn-square.btn-play { background-color: var(--color-new); color: var(--color-bg); border: none; }
 .btn-square.btn-play.playing { background-color: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-surface); }
 
-/* 중앙 종료 아이콘 버튼 */
-#end-message {
-  display: none;
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 15;
-}
-#end-message button {
-  width: 72px; height: 72px;
-  border-radius: 50%;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-  padding: 0; display: flex; align-items: center; justify-content: center;
-}
+#end-message { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 15; }
+#end-message button { width: 72px; height: 72px; border-radius: 50%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); padding: 0; display: flex; align-items: center; justify-content: center; }
 
-.step-indicator {
-  text-align: center; font-size: 13px; color: var(--color-text); white-space: nowrap;
-}
+.step-indicator { text-align: center; font-size: 13px; color: var(--color-text); white-space: nowrap; }
+#phase-info { font-size: 14px; font-weight: bold; color: var(--color-new); text-align: center; }
 
-#phase-info { 
-  font-size: 14px; font-weight: bold; color: var(--color-new); text-align: center;
-}
-
-#camera-group, .person-group {
-  transform-origin: 0px 0px;
-  transition: transform var(--transition-duration) linear, -webkit-transform var(--transition-duration) linear;
-  will-change: transform;
-}
-
-.foot-path {
-  transition: fill var(--transition-duration) ease, stroke var(--transition-duration) ease, stroke-width var(--transition-duration) ease, filter var(--transition-duration) ease;
-}
+#camera-group, .person-group { transform-origin: 0px 0px; transition: transform var(--transition-duration) linear, -webkit-transform var(--transition-duration) linear; will-change: transform; }
+.foot-path { transition: fill var(--transition-duration) ease, stroke var(--transition-duration) ease, stroke-width var(--transition-duration) ease, filter var(--transition-duration) ease; }
 
 /* 튜토리얼 오버레이 */
-#tutorial-overlay {
-  position: fixed; inset: 0;
-  z-index: 9999; display: none; cursor: pointer;
-}
-.tut-highlight {
-  position: absolute;
-  border: 3px solid var(--color-accent);
-  border-radius: 16px;
-  box-shadow: 0 0 0 9999px rgba(0,0,0,0.75); 
-  pointer-events: none;
-  transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-  background: transparent;
-}
-.tut-tooltip {
-  position: absolute; background: white; color: #1e293b; padding: 16px;
-  border-radius: 12px; width: 260px; font-size: 14px; font-weight: 600;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.3); pointer-events: none;
-  transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); z-index: 10001;
-}
-.tut-hint {
-  font-size: 11px; font-weight: normal; color: #64748b; margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 8px;
-}
-.tut-close-btn {
-  position: absolute; top: 20px; left: 20px; background: rgba(255,255,255,0.2);
-  color: white; border: none; padding: 8px 16px; border-radius: 20px;
-  font-weight: bold; cursor: pointer; z-index: 10002; backdrop-filter: blur(4px);
-}
+#tutorial-overlay { position: fixed; inset: 0; z-index: 9999; display: none; cursor: pointer; }
+.tut-highlight { position: absolute; border: 3px solid var(--color-accent); border-radius: 16px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.75); pointer-events: none; transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); background: transparent; }
+.tut-tooltip { position: absolute; background: white; color: #1e293b; padding: 16px; border-radius: 12px; width: 260px; font-size: 14px; font-weight: 600; box-shadow: 0 10px 25px rgba(0,0,0,0.3); pointer-events: none; transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); z-index: 10001; }
+.tut-hint { font-size: 11px; font-weight: normal; color: #64748b; margin-top: 8px; border-top: 1px solid #e2e8f0; padding-top: 8px; }
+.tut-close-btn { position: absolute; top: 20px; left: 20px; background: rgba(255,255,255,0.2); color: white; border: none; padding: 8px 16px; border-radius: 20px; font-weight: bold; cursor: pointer; z-index: 10002; backdrop-filter: blur(4px); }
 
 @media (max-width: 600px) {
   .app-container { padding: 6px; }
@@ -269,6 +228,7 @@ input[type=range]::-webkit-slider-thumb {
   .btn-square { width: 40px; height: 40px; }
   .mode-overlay { top: 8px; right: 8px; padding: 4px 6px; }
   .square-mode-btn { width: 32px; height: 32px; font-size: 13px; }
+  #signal-panel { top: 56px; left: 8px; width: 100px; padding: 8px; }
 }
 </style>
 </head>
@@ -286,8 +246,29 @@ input[type=range]::-webkit-slider-thumb {
 <div class="app-container">
   <div class="simulation-wrapper">
     
-    <div class="help-btn-container" style="position: absolute; top: 12px; left: 12px; z-index: 10;">
-      <button class="square-mode-btn" onclick="startTutorial()" title="튜토리얼 다시 보기" style="background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--color-surface); color: var(--color-text);">?</button>
+    <div class="help-btn-container">
+      <button class="square-mode-btn" onclick="startTutorial()" title="튜토리얼 다시 보기" style="background: rgba(45, 45, 45, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--color-surface); color: var(--color-text);">?</button>
+    </div>
+
+    <!-- 🌟 신규: 사전 시그널 표시기 -->
+    <div id="signal-panel">
+      <div class="signal-header">지시 시그널</div>
+      <div id="sig-icon-wrap">
+        <!-- Idle Icon -->
+        <svg id="icon-sig-idle" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><rect x="6" y="11" width="12" height="2"/></svg>
+        <!-- Rotate Icon -->
+        <svg id="icon-sig-rotate" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" style="display:none;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" transform="rotate(-45 12 12)"/></svg>
+        <!-- Forward Icon -->
+        <svg id="icon-sig-forward" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" style="display:none;"><path d="M12 2L4.5 12h5v8h5v-8h5L12 2z"/></svg>
+        <!-- Stop Icon -->
+        <svg id="icon-sig-stop" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" style="display:none;"><path d="M8 2h8l6 6v8l-6 6H8l-6-6V8l6-6z M10 8v8h4V8h-4z"/></svg>
+      </div>
+      <div id="signal-name" style="color: var(--color-idle)">대기 중</div>
+      <div class="signal-bars">
+        <div class="sig-bar" id="sig-bar-1"></div>
+        <div class="sig-bar" id="sig-bar-2"></div>
+        <div class="sig-bar" id="sig-bar-3"></div>
+      </div>
     </div>
 
     <div class="mode-overlay">
@@ -527,6 +508,80 @@ function buildSimulation() {
   render(true);
 }
 
+// 🌟 시그널 패널 업데이트 로직 (2스텝 전부터 타겟 스텝까지 3단계 알림)
+function updateSignal(step, mode) {
+  // 모드별 메소드 타겟 스텝 정의
+  const signals = {
+      1: [ {type: 'ROTATE', t: 4}, {type: 'STOP', t: 21} ],
+      2: [ {type: 'ROTATE', t: 5}, {type: 'STOP', t: 20}, {type: 'FORWARD', t: 29}, {type: 'STOP', t: 32} ],
+      3: [ {type: 'ROTATE', t: 5}, {type: 'FORWARD', t: 45}, {type: 'STOP', t: 46} ]
+  };
+
+  let activeSig = null;
+  let minD = 999;
+
+  // 현재 스텝에서 (target - 2) ~ (target) 구간에 있는 시그널 탐색
+  signals[mode].forEach(s => {
+      let d = s.t - step;
+      if (d >= 0 && d <= 2) {
+          if (d < minD) { minD = d; activeSig = s; }
+      }
+  });
+
+  const panel = document.getElementById('signal-panel');
+  const nameEl = document.getElementById('signal-name');
+  const b1 = document.getElementById('sig-bar-1');
+  const b2 = document.getElementById('sig-bar-2');
+  const b3 = document.getElementById('sig-bar-3');
+  
+  document.getElementById('icon-sig-idle').style.display = 'none';
+  document.getElementById('icon-sig-rotate').style.display = 'none';
+  document.getElementById('icon-sig-forward').style.display = 'none';
+  document.getElementById('icon-sig-stop').style.display = 'none';
+  
+  panel.style.color = 'inherit';
+  panel.classList.remove('blink-anim');
+  
+  // 강제 리플로우를 통한 애니메이션 재시작 트릭
+  void panel.offsetWidth;
+
+  if (!activeSig) {
+      panel.style.borderColor = 'var(--color-idle)';
+      nameEl.innerText = '대기 중';
+      nameEl.style.color = 'var(--color-idle)';
+      document.getElementById('icon-sig-idle').style.display = 'block';
+      document.getElementById('icon-sig-idle').style.color = 'var(--color-idle)';
+      b1.style.background = 'var(--color-idle)';
+      b2.style.background = 'var(--color-idle)';
+      b3.style.background = 'var(--color-idle)';
+  } else {
+      let color = ''; let text = ''; let iconId = '';
+      if (activeSig.type === 'ROTATE') { color = 'var(--color-rotate)'; text = '회전'; iconId = 'icon-sig-rotate'; }
+      else if (activeSig.type === 'FORWARD') { color = 'var(--color-forward)'; text = '전진'; iconId = 'icon-sig-forward'; }
+      else if (activeSig.type === 'STOP') { color = 'var(--color-stop)'; text = '정지'; iconId = 'icon-sig-stop'; }
+
+      panel.style.borderColor = color;
+      panel.style.color = color;
+      nameEl.style.color = color;
+      document.getElementById(iconId).style.display = 'block';
+      document.getElementById(iconId).style.color = color;
+
+      let level = 3 - minD; 
+      
+      if (level === 1) {
+          nameEl.innerText = text + ' 준비';
+          b1.style.background = color; b2.style.background = 'var(--color-idle)'; b3.style.background = 'var(--color-idle)';
+      } else if (level === 2) {
+          nameEl.innerText = text + ' 임박';
+          b1.style.background = color; b2.style.background = color; b3.style.background = 'var(--color-idle)';
+      } else if (level === 3) {
+          nameEl.innerText = text + ' 실행!';
+          b1.style.background = color; b2.style.background = color; b3.style.background = color;
+          panel.classList.add('blink-anim');
+      }
+  }
+}
+
 function updateStatusText() {
   document.getElementById('current-step').innerText = currentStep;
   document.getElementById('prev-btn').disabled = (currentStep === 0);
@@ -540,26 +595,28 @@ function updateStatusText() {
   if (currentMode === 1) {
       if (currentStep === 0) phase = "준비 완료";
       else if (currentStep <= 3) phase = "전진 중";
-      else if (currentStep <= 20) phase = "회전 중";
+      else if (currentStep < 21) phase = "회전 중";
       else if (currentStep === 21) phase = "회전 완료";
       else phase = "시뮬레이션 종료";
   } else if (currentMode === 2) {
       if (currentStep === 0) phase = "준비 완료";
       else if (currentStep <= 4) phase = "전진 중";
-      else if (currentStep <= 25) phase = "회전 중";
+      else if (currentStep < 26) phase = "회전 중";
       else if (currentStep <= 28) phase = "회전 완료";
       else if (currentStep <= 31) phase = "전진 중";
       else phase = "시뮬레이션 종료";
   } else if (currentMode === 3) {
-      // 🌟 42스텝에 회전 완료 표시, 43스텝부터 다시 전진 중 표시
       if (currentStep === 0) phase = "준비 완료";
       else if (currentStep <= 4) phase = "전진 중";
-      else if (currentStep <= 41) phase = "회전 중";
+      else if (currentStep < 42) phase = "회전 중";
       else if (currentStep === 42) phase = "회전 완료";
       else if (currentStep <= 45) phase = "전진 중";
       else phase = "시뮬레이션 종료";
   }
   document.getElementById('phase-info').innerText = phase;
+  
+  // 상태 업데이트와 함께 시그널 패널도 업데이트
+  updateSignal(currentStep, currentMode);
 }
 
 function runLogicMode1() {
@@ -848,14 +905,16 @@ function render(isInitialBuild = false) {
                        ${cellSize * 45},${-cellSize * 45} 
                        ${cellSize * 62},${cellSize * 35}" 
                fill="rgba(56, 189, 248, 0.08)" 
-               stroke="rgba(56, 189, 248, 0.35)" 
+               stroke="var(--color-accent)" 
+               stroke-opacity="0.35"
                stroke-width="2.5" 
                stroke-dasharray="6 6"/>
       <rect x="${-cellSize * 45}" y="${cellSize * 4}" 
             width="${cellSize * 45}" height="${cellSize * 42}" 
             transform="rotate(30, ${-cellSize * 22}, ${cellSize * 25})"
             fill="rgba(245, 158, 11, 0.08)" 
-            stroke="rgba(245, 158, 11, 0.35)" 
+            stroke="var(--color-new)" 
+            stroke-opacity="0.35"
             stroke-width="2.5" 
             stroke-dasharray="5 5"/>
     `;
@@ -974,6 +1033,7 @@ const tutSteps = [
   { target: '.controls-overlay', text: "시뮬레이션 조작부입니다. 스텝 이동, 재생 및 초기화를 제어할 수 있습니다.", align: 'top', padding: 5 },
   { target: '.speed-control-container', text: "재생 속도를 0.5배속에서 2.0배속까지 세밀하게 조절할 수 있습니다.", align: 'top', padding: 5 },
   { target: 'PEOPLE_BBOX', text: "사람을 클릭하면 포커스 기능이 활성화되어, 집중해서 보고 싶은 사람을 시각적으로 강조해 줍니다.", align: 'top', padding: 20 },
+  { target: '#signal-panel', text: "메소드(회전, 전진, 정지) 실행 2스텝 전부터 알려주는 사전 시그널 표시기입니다.", align: 'right', padding: 5 },
   { target: '.mode-overlay', text: "회전 방식을 선택할 수 있습니다. 1, 2, 3번 모드를 지원합니다.", align: 'bottom', padding: 5 } 
 ];
 
@@ -1056,6 +1116,9 @@ function showTutorialStep() {
   } else if (stepInfo.align === 'left') {
     tTop = rect.top + (rect.height / 2) - (tooltipRect.height / 2);
     tLeft = rect.left - tooltipRect.width - 15 - padding;
+  } else if (stepInfo.align === 'right') {
+    tTop = rect.top + (rect.height / 2) - (tooltipRect.height / 2);
+    tLeft = rect.left + rect.width + 15 + padding;
   } else {
     tTop = rect.top + (rect.height / 2) - (tooltipRect.height / 2);
     tLeft = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
