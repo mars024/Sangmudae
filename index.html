@@ -175,16 +175,17 @@ body {
   white-space: nowrap;
 }
 
+/* 카메라 추적 시 모든 요소를 부드럽게 이동시키기 위한 그룹 전환 효과 */
+#camera-group {
+  transition: transform 0.3s linear;
+}
+
 .person-group {
   transition: transform 0.3s linear;
 }
 
 .foot-path {
   transition: fill 0.15s ease, stroke 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease;
-}
-
-#bg-landmarks {
-  transition: transform 0.3s linear;
 }
 
 @media (max-width: 600px) {
@@ -251,9 +252,9 @@ body {
 <script>
 let m = 4; 
 let n = 4; 
-let currentMode = 1;
+let currentMode = 1; /* 1번 모드로 초기값 복원 */
 let currentStep = 0;
-let maxSteps = 25;
+let maxSteps = 22;
 let highlightedId = null;
 
 let isPlaying = false;
@@ -321,7 +322,6 @@ class Person {
     this.westStepCount += speed;   
     this.northStepCount = 0;  
     this.northWestStepCount = 0;
-    this.westCountDown = -1;
   }
 
   moveNorthWest(speed = 1) {
@@ -345,7 +345,6 @@ class Person {
     this.westStepCount = 0;   
     this.northStepCount = 0;  
     this.northWestStepCount = 0;
-    this.stopCountDown = -1;  
   }
   
   repeatLastCommand() {
@@ -471,73 +470,48 @@ function runLogicMode1() {
   }
 }
 
-// 🌟 2번 로직: 2스텝 지연 시작 엄수 + 평행사변형 보정
 function runLogicMode2() {
   people = [];
-  for (let x = 1; x <= m; x++) { 
-    for (let y = 1; y <= n; y++) { 
-      people.push(new Person(`${x}-${y}`, x, y, y * 2, x * 2));
+  for (let r = 1; r <= m; r++) { 
+    for (let c = 1; c <= n; c++) { 
+      people.push(new Person(`${r}-${c}`, r, c, c * 2, r * 2));
     }
   }
   
-  maxSteps = 28; // 25스텝 정지 + 여유
-  const getPerson = (targetX, targetY) => people.find(p => p.xIdx === targetX && p.yIdx === targetY);
+  maxSteps = 32; 
 
   for (let step = 1; step <= maxSteps; step++) {
-    
-    // 1. 공통 규칙: 직전 명령 반복 예약
     people.forEach(p => {
-        if (step === 1) {
-            p.nextCommand = 'NORTH';
-            p.nextSpeed = 1;
-        } else {
-            p.nextCommand = p.direction;
-            p.nextSpeed = p.currentSpeed;
-        }
-    });
+        let r = p.xIdx;
+        let c = p.yIdx;
 
-    for (let x = 1; x <= m; x++) {
-      let delay = (x - 1) * 2;
-      let p1 = getPerson(x, 1);
-      let p2 = getPerson(x, 2);
-      let p3 = getPerson(x, 3);
-      let p4 = getPerson(x, 4);
+        let rowDelay = (r - 1) * 2;
+        let myRotationStartStep = 4 + rowDelay;
 
-      // --- [회전 메소드: 시작 타이밍 2스텝 차이 엄수] ---
-      
-      // Col 1: 5스텝 시작 (북서진 없이 서진)
-      if (step === 5 + delay) { p1.nextCommand = 'WEST'; p1.nextSpeed = 1; }
+        if (step < 20) {
+            if (step <= myRotationStartStep) {
+                p.moveNorth(1.0);
+            } else {
+                let t = step - myRotationStartStep;
+                let nwDuration = (c - 1) * 2; 
+                
+                if (t <= nwDuration) {
+                    p.moveNorthWest(1.0);
+                } else {
+                    p.moveWest(0.5); 
+                }
+            }
+        } 
+        else if (step === 20) { p.stop(); }
+        else if (step === 21) { if (c === 2) p.moveWest(1.0); else p.stop(); }
+        else if (step === 22) { p.stop(); }
+        else if (step === 23) { if (c === 3) p.moveWest(2.0); else p.stop(); }
+        else if (step === 24) { p.stop(); }
+        else if (step === 25) { if (c === 4) p.moveWest(3.0); else p.stop(); }
+        else if (step === 26) { p.stop(); }
+        else if (step === 27 || step === 28) { p.stop(); }
+        else if (step >= 29 && step <= 32) { p.moveWest(0.5); }
 
-      // Col 2: 7스텝 시작 (2스텝 북서진 후 서진)
-      if (step === 7 + delay) { p2.nextCommand = 'NORTHWEST'; p2.nextSpeed = 1; }
-      if (step === 9 + delay) { p2.nextCommand = 'WEST'; p2.nextSpeed = 1; }
-
-      // Col 3: 9스텝 시작 (간격 동일화를 위해 4스텝 북서진 후 서진)
-      if (step === 9 + delay) { p3.nextCommand = 'NORTHWEST'; p3.nextSpeed = 1; }
-      if (step === 13 + delay) { p3.nextCommand = 'WEST'; p3.nextSpeed = 1; }
-
-      // Col 4: 11스텝 시작 (간격 동일화를 위해 6스텝 북서진 후 서진)
-      if (step === 11 + delay) { p4.nextCommand = 'NORTHWEST'; p4.nextSpeed = 1; }
-      if (step === 17 + delay) { p4.nextCommand = 'WEST'; p4.nextSpeed = 1; }
-    }
-
-    // --- [정지 메소드] ---
-    // 마지막 인원 (4,4)가 서진을 시작하는 스텝 = 11(Col4시작) + 6(Row4지연) + 6(NW지속) = 23스텝
-    // 전원 서쪽 전환 완료(23스텝)로부터 2스텝 뒤인 25스텝에 전원 동시 정지
-    if (step === 25) {
-        people.forEach(p => {
-            p.nextCommand = 'STOP';
-            p.nextSpeed = 0;
-        });
-    }
-
-    // 3. 덮어씌워진 최종 명령 실행
-    people.forEach(p => {
-        if (p.nextCommand === 'NORTH') p.moveNorth(p.nextSpeed);
-        else if (p.nextCommand === 'WEST') p.moveWest(p.nextSpeed);
-        else if (p.nextCommand === 'NORTHWEST') p.moveNorthWest(p.nextSpeed);
-        else if (p.nextCommand === 'STOP') p.stop();
-        
         p.recordHistory();
     });
   }
@@ -569,12 +543,18 @@ function render(isInitialBuild = false) {
   const cellSize = targetSubwayLength / (initialSpan > 0 ? initialSpan : 1);
   const radius = cellSize * 0.45; 
 
+  let baseOriginX = (width / 2) - (2 * cellSize);
+  let baseOriginY = (height / 2) - (1 * cellSize);
+
   let cameraOffsetX = 0;
   let cameraOffsetY = 0;
   
-  if (currentMode === 2 && highlightedId) {
+  if (highlightedId) {
     const hp = people.find(p => p.id === highlightedId);
-    if (hp) {
+    if (hp && hp.history[currentStep]) {
+      const currState = hp.history[currentStep];
+      
+      // X축 추적: 서진을 시작한 이후부터 작동
       let westStartStep = -1;
       for (let i = 0; i <= currentStep; i++) {
         if (hp.history[i] && hp.history[i].direction === 'WEST') {
@@ -585,15 +565,16 @@ function render(isInitialBuild = false) {
       
       if (westStartStep !== -1 && currentStep >= westStartStep) {
         const startState = hp.history[westStartStep];
-        const currState = hp.history[currentStep];
         cameraOffsetX = (startState.x - currState.x) * cellSize;
-        cameraOffsetY = (startState.y - currState.y) * cellSize;
       }
+
+      // Y축 추적: 포커스된 인원을 화면의 상단 1/3 지점에 고정시킴
+      cameraOffsetY = (height / 3) - (baseOriginY + currState.y * cellSize);
     }
   }
 
-  const originX = (width / 2) - (2 * cellSize) + cameraOffsetX;
-  const originY = (height / 2) - (1 * cellSize) + cameraOffsetY;
+  const originX = baseOriginX + cameraOffsetX;
+  const originY = baseOriginY + cameraOffsetY;
 
   if (isInitialBuild || svg.children.length === 0) {
     svg.innerHTML = '';
@@ -608,16 +589,24 @@ function render(isInitialBuild = false) {
     `;
     svg.appendChild(defs);
 
+    // 카메라 그룹 생성: 배경과 모든 요소를 통째로 이동시켜 부드러운 패닝 효과 구현
+    const cameraGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    cameraGroup.setAttribute('id', 'camera-group');
+    svg.appendChild(cameraGroup);
+
+    // 넓은 배경 격자 생성
     const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     bgRect.setAttribute('id', 'sim-bg-grid');
-    bgRect.setAttribute('width', '100%');
-    bgRect.setAttribute('height', '100%');
+    bgRect.setAttribute('x', '-5000');
+    bgRect.setAttribute('y', '-5000');
+    bgRect.setAttribute('width', '10000');
+    bgRect.setAttribute('height', '10000');
     bgRect.setAttribute('fill', 'url(#grid-pattern)');
-    svg.appendChild(bgRect);
+    cameraGroup.appendChild(bgRect);
 
     const landmarksGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     landmarksGroup.setAttribute('id', 'bg-landmarks');
-    svg.appendChild(landmarksGroup);
+    cameraGroup.appendChild(landmarksGroup);
 
     people.forEach(p => {
       const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -639,21 +628,26 @@ function render(isInitialBuild = false) {
       g.appendChild(rightFoot);
       g.appendChild(centerLine);
       g.appendChild(arrow);
-      svg.appendChild(g);
+      cameraGroup.appendChild(g);
     });
+  }
+
+  // 카메라 그룹 위치 업데이트 (CSS transition으로 부드럽게 이동)
+  const cameraGroup = svg.querySelector('#camera-group');
+  if (cameraGroup) {
+    cameraGroup.setAttribute('transform', `translate(${originX}, ${originY})`);
   }
 
   const gridPattern = svg.querySelector('#grid-pattern');
   if (gridPattern) {
     gridPattern.setAttribute('width', cellSize);
     gridPattern.setAttribute('height', cellSize);
-    gridPattern.setAttribute('x', originX);
-    gridPattern.setAttribute('y', originY);
+    gridPattern.setAttribute('x', 0);
+    gridPattern.setAttribute('y', 0);
   }
 
   const landmarksGroup = svg.querySelector('#bg-landmarks');
   if (landmarksGroup) {
-    landmarksGroup.setAttribute('transform', `translate(${originX}, ${originY})`);
     landmarksGroup.innerHTML = `
       <polygon points="${cellSize * 3},${-cellSize * 6} ${cellSize * 45},${-cellSize * 45} ${cellSize * 62},${cellSize * 35}" 
                fill="rgba(56, 189, 248, 0.08)" stroke="rgba(56, 189, 248, 0.35)" stroke-width="2.5" stroke-dasharray="6 6"/>
@@ -669,8 +663,9 @@ function render(isInitialBuild = false) {
     const state = p.history[currentStep];
     if (!state) return;
 
-    const cx = originX + state.x * cellSize;
-    const cy = originY + state.y * cellSize;
+    // 인원들의 렌더링 위치는 카메라 그룹 내부 좌표를 기준으로 적용
+    const cx = state.x * cellSize;
+    const cy = state.y * cellSize;
     g.setAttribute('transform', `translate(${cx}, ${cy}) rotate(${state.angle})`);
 
     const isHighlighted = (p.id === highlightedId);
