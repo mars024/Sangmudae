@@ -5,19 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>행렬 좌회전 시뮬레이터</title>
 <style>
-/* 🌟 색약/색맹 접근성 배려 (Okabe-Ito 팔레트 기반 다크모드) */
 :root {
-  --color-bg: #121212;         /* 딥 다크 그레이 (배경) */
-  --color-surface: #2d2d2d;    /* 표면, 비활성 버튼 */
-  --color-text: #f5f5f5;       /* 일반 텍스트 (명도 대비 확보) */
-  --color-idle: #737373;       /* 대기/비활성 시그널 */
+  --color-bg: #121212;         
+  --color-surface: #2d2d2d;    
+  --color-text: #f5f5f5;       
+  --color-idle: #737373;       
   
-  --color-accent: #56B4E9;     /* 스카이 블루 - 발 기본색, 모드 활성색 */
-  --color-new: #E69F00;        /* 오렌지 - 발 움직임, 플레이 버튼 */
+  --color-accent: #56B4E9;     
+  --color-new: #E69F00;        
   
-  --color-rotate: #F0E442;     /* 옐로우 - 회전 시그널 */
-  --color-forward: #009E73;    /* 청록색(Bluish Green) - 전진 시그널 */
-  --color-stop: #D55E00;       /* 버밀리온(주황-적색) - 정지 시그널 */
+  --color-rotate: #F0E442;     
+  --color-forward: #009E73;    
+  --color-stop: #D55E00;       
   
   --transition-duration: 0.3s;
 }
@@ -56,6 +55,7 @@ body {
   border-radius: 16px;
   border: 1px solid var(--color-surface);
   overflow: hidden;
+  transform: translateZ(0);
 }
 
 .help-btn-container {
@@ -65,57 +65,65 @@ body {
   z-index: 10;
 }
 
-/* 🌟 신규: 사전 시그널 패널 UI */
-#signal-panel {
+.bottom-ui-wrapper {
   position: absolute;
-  top: 60px; 
-  left: 12px;
-  width: 110px;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  z-index: 10;
+}
+
+#signal-panel {
   background: rgba(45, 45, 45, 0.85); 
   border: 2px solid var(--color-idle);
   border-radius: 12px;
-  padding: 10px;
+  padding: 8px 16px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 8px;
-  z-index: 10;
+  gap: 12px;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
 }
 
-.signal-header {
-  font-size: 11px;
-  color: var(--color-text);
-  opacity: 0.8;
-  font-weight: bold;
-}
-
 #sig-icon-wrap {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+.signal-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
 #signal-name {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 800;
-  white-space: nowrap;
+  line-height: 1;
+  letter-spacing: 2px;
 }
 
 .signal-bars {
   display: flex;
-  gap: 4px;
-  width: 100%;
-  height: 6px;
+  gap: 6px;
 }
 
 .sig-bar {
-  flex: 1;
-  border-radius: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
   background: var(--color-idle);
   transition: background 0.2s ease;
 }
@@ -125,7 +133,6 @@ body {
   50% { box-shadow: 0 0 15px inset currentColor, 0 0 15px currentColor; }
   100% { box-shadow: 0 0 0px inset transparent, 0 0 0px transparent; }
 }
-
 .blink-anim {
   animation: panelBlink 0.5s ease-in-out;
 }
@@ -147,15 +154,7 @@ body {
   align-items: center;
 }
 
-.mode-title {
-  font-size: 11px;
-  font-weight: bold;
-  color: var(--color-text);
-  white-space: nowrap;
-  margin-bottom: 2px;
-  opacity: 0.8;
-}
-
+.mode-title { font-size: 11px; font-weight: bold; color: var(--color-text); white-space: nowrap; margin-bottom: 2px; opacity: 0.8; }
 .mode-buttons-group { display: flex; gap: 6px; }
 
 .square-mode-btn {
@@ -164,24 +163,21 @@ body {
   border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;
   transition: all 0.2s ease;
 }
-
-.square-mode-btn.active {
-  background-color: var(--color-accent);
-  color: var(--color-bg);
-  opacity: 1;
-}
+.square-mode-btn.active { background-color: var(--color-accent); color: var(--color-bg); opacity: 1; }
 
 #sim-canvas { width: 100%; height: 100%; display: block; }
 
 .controls-overlay {
-  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 10;
+  width: 100%;
   display: flex; flex-direction: column; align-items: center; gap: 10px;
   background: rgba(45, 45, 45, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   padding: 12px 20px; border-radius: 16px; border: 1px solid var(--color-surface);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5); width: 90%; max-width: 360px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
 }
 
-.speed-control-container { display: flex; align-items: center; width: 100%; gap: 10px; }
+.speed-control-container { display: flex; flex-direction: column; width: 100%; gap: 6px; }
+.speed-header { width: 100%; text-align: center; font-size: 12px; font-weight: bold; color: var(--color-text); opacity: 0.9; }
+.slider-row { display: flex; align-items: center; width: 100%; gap: 10px; }
 .speed-label { font-size: 11px; font-weight: bold; color: var(--color-text); opacity: 0.8; white-space: nowrap; }
 .slider-wrapper { flex: 1; position: relative; display: flex; align-items: center; }
 input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; z-index: 2; margin: 0; }
@@ -193,14 +189,9 @@ input[type=range]::-webkit-slider-thumb { height: 16px; width: 16px; border-radi
 
 .step-controls { display: flex; justify-content: center; gap: 12px; width: 100%; }
 
-.btn-square {
-  width: 44px; height: 44px; padding: 0; background-color: var(--color-surface); color: var(--color-text);
-  border: 1px solid var(--color-surface); border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;
-}
-
+.btn-square { width: 44px; height: 44px; padding: 0; background-color: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-surface); border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; }
 .btn-square:active:not(:disabled) { transform: scale(0.92); }
 .btn-square:disabled { opacity: 0.3; cursor: not-allowed; }
-
 .btn-square.btn-primary { background-color: var(--color-accent); color: var(--color-bg); border: none; }
 .btn-square.btn-play { background-color: var(--color-new); color: var(--color-bg); border: none; }
 .btn-square.btn-play.playing { background-color: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-surface); }
@@ -211,10 +202,14 @@ input[type=range]::-webkit-slider-thumb { height: 16px; width: 16px; border-radi
 .step-indicator { text-align: center; font-size: 13px; color: var(--color-text); white-space: nowrap; }
 #phase-info { font-size: 14px; font-weight: bold; color: var(--color-new); text-align: center; }
 
-#camera-group, .person-group { transform-origin: 0px 0px; transition: transform var(--transition-duration) linear, -webkit-transform var(--transition-duration) linear; will-change: transform; }
-.foot-path { transition: fill var(--transition-duration) ease, stroke var(--transition-duration) ease, stroke-width var(--transition-duration) ease, filter var(--transition-duration) ease; }
+#camera-group, .person-group { 
+  transform-origin: 0px 0px; 
+  transition: transform var(--transition-duration) linear, -webkit-transform var(--transition-duration) linear; 
+}
+.foot-path { 
+  transition: fill var(--transition-duration) ease, stroke var(--transition-duration) ease, stroke-width var(--transition-duration) ease; 
+}
 
-/* 튜토리얼 오버레이 */
 #tutorial-overlay { position: fixed; inset: 0; z-index: 9999; display: none; cursor: pointer; }
 .tut-highlight { position: absolute; border: 3px solid var(--color-accent); border-radius: 16px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.75); pointer-events: none; transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); background: transparent; }
 .tut-tooltip { position: absolute; background: white; color: #1e293b; padding: 16px; border-radius: 12px; width: 260px; font-size: 14px; font-weight: 600; box-shadow: 0 10px 25px rgba(0,0,0,0.3); pointer-events: none; transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1); z-index: 10001; }
@@ -224,11 +219,11 @@ input[type=range]::-webkit-slider-thumb { height: 16px; width: 16px; border-radi
 @media (max-width: 600px) {
   .app-container { padding: 6px; }
   .simulation-wrapper { border-radius: 12px; }
-  .controls-overlay { bottom: 10px; width: 95%; padding: 10px 12px; }
+  .bottom-ui-wrapper { bottom: 10px; width: 95%; }
+  .controls-overlay { padding: 10px 12px; }
   .btn-square { width: 40px; height: 40px; }
   .mode-overlay { top: 8px; right: 8px; padding: 4px 6px; }
   .square-mode-btn { width: 32px; height: 32px; font-size: 13px; }
-  #signal-panel { top: 56px; left: 8px; width: 100px; padding: 8px; }
 }
 </style>
 </head>
@@ -247,28 +242,7 @@ input[type=range]::-webkit-slider-thumb { height: 16px; width: 16px; border-radi
   <div class="simulation-wrapper">
     
     <div class="help-btn-container">
-      <button class="square-mode-btn" onclick="startTutorial()" title="튜토리얼 다시 보기" style="background: rgba(45, 45, 45, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--color-surface); color: var(--color-text);">?</button>
-    </div>
-
-    <!-- 🌟 신규: 사전 시그널 표시기 -->
-    <div id="signal-panel">
-      <div class="signal-header">지시 시그널</div>
-      <div id="sig-icon-wrap">
-        <!-- Idle Icon -->
-        <svg id="icon-sig-idle" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><rect x="6" y="11" width="12" height="2"/></svg>
-        <!-- Rotate Icon -->
-        <svg id="icon-sig-rotate" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" style="display:none;"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" transform="rotate(-45 12 12)"/></svg>
-        <!-- Forward Icon -->
-        <svg id="icon-sig-forward" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" style="display:none;"><path d="M12 2L4.5 12h5v8h5v-8h5L12 2z"/></svg>
-        <!-- Stop Icon -->
-        <svg id="icon-sig-stop" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" style="display:none;"><path d="M8 2h8l6 6v8l-6 6H8l-6-6V8l6-6z M10 8v8h4V8h-4z"/></svg>
-      </div>
-      <div id="signal-name" style="color: var(--color-idle)">대기 중</div>
-      <div class="signal-bars">
-        <div class="sig-bar" id="sig-bar-1"></div>
-        <div class="sig-bar" id="sig-bar-2"></div>
-        <div class="sig-bar" id="sig-bar-3"></div>
-      </div>
+      <button class="square-mode-btn" onclick="startTutorial()" title="튜토리얼 보기" style="background: rgba(45, 45, 45, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--color-surface); color: var(--color-text);">?</button>
     </div>
 
     <div class="mode-overlay">
@@ -288,38 +262,69 @@ input[type=range]::-webkit-slider-thumb { height: 16px; width: 16px; border-radi
       </button>
     </div>
 
-    <div class="controls-overlay">
-      <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 4px;">
-        <div id="phase-info">준비 완료</div>
-        <div class="step-indicator">스텝: <span id="current-step" style="color: var(--color-accent); font-weight: bold;">0</span> / <span id="total-steps">0</span></div>
-      </div>
-
-      <div class="speed-control-container">
-        <span class="speed-label">x0.5</span>
-        <div class="slider-wrapper">
-          <input type="range" id="speed-slider" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updateSpeed()">
-          <div class="slider-ticks">
-            <span class="tick-mark" style="left: 33.33%;"></span>
-            <span class="tick-mark" style="left: 66.66%;"></span>
+    <div class="bottom-ui-wrapper">
+      
+      <div id="signal-panel">
+        <div id="sig-icon-wrap">
+          <svg id="icon-sig-idle" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><circle cx="12" cy="12" r="4"/></svg>
+          <svg id="icon-sig-rotate" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+            <path d="M16 22 L16 12 Q16 6 10 6 L4 6" />
+            <polygon points="6,2 6,10 0,6" fill="currentColor" stroke="none" />
+          </svg>
+          <svg id="icon-sig-forward" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+            <path d="M12 22 L12 4" />
+            <polygon points="8,6 16,6 12,0" fill="currentColor" stroke="none" />
+          </svg>
+          <svg id="icon-sig-stop" viewBox="0 0 24 24" width="24" height="24" fill="currentColor" style="display:none;">
+            <rect x="5" y="5" width="14" height="14" rx="2" />
+          </svg>
+        </div>
+        <div class="signal-info">
+          <div id="signal-name" style="color: var(--color-idle)">대기 중</div>
+          <div class="signal-bars">
+            <div class="sig-bar" id="sig-bar-1"></div>
+            <div class="sig-bar" id="sig-bar-2"></div>
+            <div class="sig-bar" id="sig-bar-3"></div>
           </div>
         </div>
-        <span class="speed-label">x2.0</span>
       </div>
 
-      <div class="step-controls">
-        <button class="btn-square" onclick="resetSim()" title="초기화">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
-        </button>
-        <button class="btn-square btn-primary" id="prev-btn" onclick="prevStep()" title="이전 스텝" disabled>
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
-        </button>
-        <button class="btn-square btn-play" id="play-btn" onclick="togglePlay()" title="재생">
-          <svg id="icon-play" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-          <svg id="icon-pause" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" style="display:none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-        </button>
-        <button class="btn-square btn-primary" id="next-btn" onclick="nextStep()" title="다음 스텝">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
-        </button>
+      <div class="controls-overlay">
+        <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; margin-bottom: 4px;">
+          <div id="phase-info">준비 완료</div>
+          <div class="step-indicator">스텝: <span id="current-step" style="color: var(--color-accent); font-weight: bold;">0</span> / <span id="total-steps">0</span></div>
+        </div>
+
+        <div class="speed-control-container">
+          <div class="speed-header">현재 속도: x<span id="speed-val-display">1.0</span></div>
+          <div class="slider-row">
+            <span class="speed-label">x0.5</span>
+            <div class="slider-wrapper">
+              <input type="range" id="speed-slider" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updateSpeed()">
+              <div class="slider-ticks">
+                <span class="tick-mark" style="left: 33.33%;"></span>
+                <span class="tick-mark" style="left: 66.66%;"></span>
+              </div>
+            </div>
+            <span class="speed-label">x2.0</span>
+          </div>
+        </div>
+
+        <div class="step-controls">
+          <button class="btn-square" onclick="resetSim()" title="초기화">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+          </button>
+          <button class="btn-square btn-primary" id="prev-btn" onclick="prevStep()" title="이전 스텝" disabled>
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+          </button>
+          <button class="btn-square btn-play" id="play-btn" onclick="togglePlay()" title="재생">
+            <svg id="icon-play" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="icon-pause" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" style="display:none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          </button>
+          <button class="btn-square btn-primary" id="next-btn" onclick="nextStep()" title="다음 스텝">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -465,19 +470,13 @@ function init() {
   buildSimulation();
   window.addEventListener('resize', () => render(false));
   
-  setTimeout(() => {
-    try {
-      if (!localStorage.getItem('tutorialSeen')) {
-        startTutorial();
-      }
-    } catch (e) {
-      startTutorial();
-    }
-  }, 500);
+  // 🌟 항상 튜토리얼 표시
+  setTimeout(startTutorial, 500);
 }
 
 function updateSpeed() {
   playbackSpeed = parseFloat(document.getElementById('speed-slider').value);
+  document.getElementById('speed-val-display').innerText = playbackSpeed.toFixed(1);
   const transitionTime = 0.3 / playbackSpeed;
   document.documentElement.style.setProperty('--transition-duration', `${transitionTime}s`);
   
@@ -508,19 +507,16 @@ function buildSimulation() {
   render(true);
 }
 
-// 🌟 시그널 패널 업데이트 로직 (2스텝 전부터 타겟 스텝까지 3단계 알림)
 function updateSignal(step, mode) {
-  // 모드별 메소드 타겟 스텝 정의
   const signals = {
-      1: [ {type: 'ROTATE', t: 4}, {type: 'STOP', t: 21} ],
-      2: [ {type: 'ROTATE', t: 5}, {type: 'STOP', t: 20}, {type: 'FORWARD', t: 29}, {type: 'STOP', t: 32} ],
-      3: [ {type: 'ROTATE', t: 5}, {type: 'FORWARD', t: 45}, {type: 'STOP', t: 46} ]
+      1: [ {type: 'ROTATE', t: 3} ],
+      2: [ {type: 'ROTATE', t: 3}, {type: 'STOP', t: 19}, {type: 'FORWARD', t: 29} ],
+      3: [ {type: 'ROTATE', t: 5} ]
   };
 
   let activeSig = null;
   let minD = 999;
 
-  // 현재 스텝에서 (target - 2) ~ (target) 구간에 있는 시그널 탐색
   signals[mode].forEach(s => {
       let d = s.t - step;
       if (d >= 0 && d <= 2) {
@@ -541,8 +537,6 @@ function updateSignal(step, mode) {
   
   panel.style.color = 'inherit';
   panel.classList.remove('blink-anim');
-  
-  // 강제 리플로우를 통한 애니메이션 재시작 트릭
   void panel.offsetWidth;
 
   if (!activeSig) {
@@ -568,14 +562,13 @@ function updateSignal(step, mode) {
 
       let level = 3 - minD; 
       
+      nameEl.innerText = text;
+
       if (level === 1) {
-          nameEl.innerText = text + ' 준비';
           b1.style.background = color; b2.style.background = 'var(--color-idle)'; b3.style.background = 'var(--color-idle)';
       } else if (level === 2) {
-          nameEl.innerText = text + ' 임박';
           b1.style.background = color; b2.style.background = color; b3.style.background = 'var(--color-idle)';
       } else if (level === 3) {
-          nameEl.innerText = text + ' 실행!';
           b1.style.background = color; b2.style.background = color; b3.style.background = color;
           panel.classList.add('blink-anim');
       }
@@ -603,19 +596,17 @@ function updateStatusText() {
       else if (currentStep <= 4) phase = "전진 중";
       else if (currentStep < 26) phase = "회전 중";
       else if (currentStep <= 28) phase = "회전 완료";
-      else if (currentStep <= 31) phase = "전진 중";
+      else if (currentStep < maxSteps) phase = "전진 중";
       else phase = "시뮬레이션 종료";
   } else if (currentMode === 3) {
       if (currentStep === 0) phase = "준비 완료";
       else if (currentStep <= 4) phase = "전진 중";
       else if (currentStep < 42) phase = "회전 중";
-      else if (currentStep === 42) phase = "회전 완료";
-      else if (currentStep <= 45) phase = "전진 중";
+      else if (currentStep <= 44) phase = "회전 완료";
+      else if (currentStep === 45) phase = "전진 중";
       else phase = "시뮬레이션 종료";
   }
   document.getElementById('phase-info').innerText = phase;
-  
-  // 상태 업데이트와 함께 시그널 패널도 업데이트
   updateSignal(currentStep, currentMode);
 }
 
@@ -695,7 +686,7 @@ function runLogicMode2() {
     }
   }
   
-  maxSteps = 32; 
+  maxSteps = 34; 
 
   for (let step = 1; step <= maxSteps; step++) {
     people.forEach(p => {
@@ -720,8 +711,8 @@ function runLogicMode2() {
         else if (step === 24) { p.stop(); }
         else if (step === 25) { if (c === 4) p.moveWest(3.0); else p.stop(); }
         else if (step === 26) { p.stop(); }
-        else if (step === 27 || step === 28) { p.stop(); }
-        else if (step >= 29 && step <= 32) { p.moveWest(0.5); }
+        else if (step >= 27 && step <= 30) { p.stop(); } 
+        else if (step >= 31 && step <= 34) { p.moveWest(0.5); } 
 
         p.recordHistory();
     });
@@ -834,9 +825,6 @@ function render(isInitialBuild = false) {
     svg.innerHTML = '';
     const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
     defs.innerHTML = `
-      <filter id="glow-filter" x="-50%" y="-50%" width="200%" height="200%">
-        <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="var(--color-text)" flood-opacity="0.8"/>
-      </filter>
       <pattern id="grid-pattern" patternUnits="userSpaceOnUse">
         <circle cx="0" cy="0" r="2.5" fill="var(--color-accent)" opacity="0.43"/>
       </pattern>
@@ -886,8 +874,8 @@ function render(isInitialBuild = false) {
 
   const cameraGroup = svg.querySelector('#camera-group');
   if (cameraGroup) {
-    cameraGroup.style.transform = `translate(${originX}px, ${originY}px)`;
-    cameraGroup.style.webkitTransform = `translate(${originX}px, ${originY}px)`;
+    cameraGroup.style.transform = `translate3d(${originX}px, ${originY}px, 0)`;
+    cameraGroup.style.webkitTransform = `translate3d(${originX}px, ${originY}px, 0)`;
   }
 
   const gridPattern = svg.querySelector('#grid-pattern');
@@ -898,23 +886,22 @@ function render(isInitialBuild = false) {
     gridPattern.setAttribute('y', 0);
   }
 
-  const landmarksGroup = svg.querySelector('#bg-landmarks');
-  if (landmarksGroup) {
-    landmarksGroup.innerHTML = `
+  const landmarksGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  const existingLandmarks = svg.querySelector('#bg-landmarks');
+  if (existingLandmarks) {
+    existingLandmarks.innerHTML = `
       <polygon points="${cellSize * 3},${-cellSize * 6} 
                        ${cellSize * 45},${-cellSize * 45} 
                        ${cellSize * 62},${cellSize * 35}" 
-               fill="rgba(56, 189, 248, 0.08)" 
-               stroke="var(--color-accent)" 
-               stroke-opacity="0.35"
+               fill="rgba(86, 180, 233, 0.08)" 
+               stroke="rgba(86, 180, 233, 0.35)" 
                stroke-width="2.5" 
                stroke-dasharray="6 6"/>
       <rect x="${-cellSize * 45}" y="${cellSize * 4}" 
             width="${cellSize * 45}" height="${cellSize * 42}" 
             transform="rotate(30, ${-cellSize * 22}, ${cellSize * 25})"
-            fill="rgba(245, 158, 11, 0.08)" 
-            stroke="var(--color-new)" 
-            stroke-opacity="0.35"
+            fill="rgba(230, 159, 0, 0.08)" 
+            stroke="rgba(230, 159, 0, 0.35)" 
             stroke-width="2.5" 
             stroke-dasharray="5 5"/>
     `;
@@ -929,8 +916,8 @@ function render(isInitialBuild = false) {
     const cx = state.x * cellSize;
     const cy = state.y * cellSize;
     
-    g.style.transform = `translate(${cx}px, ${cy}px) rotate(${state.angle}deg)`;
-    g.style.webkitTransform = `translate(${cx}px, ${cy}px) rotate(${state.angle}deg)`;
+    g.style.transform = `translate3d(${cx}px, ${cy}px, 0) rotate(${state.angle}deg)`;
+    g.style.webkitTransform = `translate3d(${cx}px, ${cy}px, 0) rotate(${state.angle}deg)`;
 
     const isHighlighted = (p.id === highlightedId);
     const leftFoot = g.querySelector('.left-foot');
@@ -952,8 +939,15 @@ function render(isInitialBuild = false) {
     arrow.setAttribute('d', `M 0 ${-arrowSize} L ${-arrowSize*0.6} ${arrowSize*0.5} L 0 ${arrowSize*0.15} L ${arrowSize*0.6} ${arrowSize*0.5} Z`);
 
     let activeFoot = 'none';
-    if (currentStep > 0 && state.isMoving) {
-      activeFoot = (currentStep % 2 === 1) ? 'left' : 'right';
+    if (currentStep > 0) {
+      if (state.isMoving) {
+        activeFoot = (currentStep % 2 === 1) ? 'left' : 'right';
+      } else {
+        const nextState = p.history[currentStep + 1];
+        if (nextState && nextState.isMoving) {
+          activeFoot = 'left';
+        }
+      }
     }
 
     const baseColor = 'var(--color-accent)';
@@ -967,17 +961,13 @@ function render(isInitialBuild = false) {
     if (isHighlighted) {
       leftFoot.setAttribute('stroke', 'var(--color-text)');
       leftFoot.setAttribute('stroke-width', `${borderThickness * 3}`);
-      leftFoot.setAttribute('filter', 'url(#glow-filter)');
       rightFoot.setAttribute('stroke', 'var(--color-text)');
       rightFoot.setAttribute('stroke-width', `${borderThickness * 3}`);
-      rightFoot.setAttribute('filter', 'url(#glow-filter)');
     } else {
       leftFoot.setAttribute('stroke', 'var(--color-surface)');
       leftFoot.setAttribute('stroke-width', `${borderThickness}`);
-      leftFoot.removeAttribute('filter');
       rightFoot.setAttribute('stroke', 'var(--color-surface)');
       rightFoot.setAttribute('stroke-width', `${borderThickness}`);
-      rightFoot.removeAttribute('filter');
     }
   });
 }
@@ -1004,7 +994,6 @@ function prevStep() {
 
 function resetSim() { stopPlay(); buildSimulation(); }
 function updateStep() { 
-  document.getElementById('current-step').innerText = currentStep; 
   updateStatusText();
   render(false); 
 }
@@ -1030,11 +1019,11 @@ function stopPlay() {
 /* 튜토리얼 로직 */
 let currentTutStep = 0;
 const tutSteps = [
-  { target: '.controls-overlay', text: "시뮬레이션 조작부입니다. 스텝 이동, 재생 및 초기화를 제어할 수 있습니다.", align: 'top', padding: 5 },
-  { target: '.speed-control-container', text: "재생 속도를 0.5배속에서 2.0배속까지 세밀하게 조절할 수 있습니다.", align: 'top', padding: 5 },
-  { target: 'PEOPLE_BBOX', text: "사람을 클릭하면 포커스 기능이 활성화되어, 집중해서 보고 싶은 사람을 시각적으로 강조해 줍니다.", align: 'top', padding: 20 },
-  { target: '#signal-panel', text: "메소드(회전, 전진, 정지) 실행 2스텝 전부터 알려주는 사전 시그널 표시기입니다.", align: 'right', padding: 5 },
-  { target: '.mode-overlay', text: "회전 방식을 선택할 수 있습니다. 1, 2, 3번 모드를 지원합니다.", align: 'bottom', padding: 5 } 
+  { target: '.controls-overlay', text: "시뮬레이션 조작 패널입니다. 좌측부터 순서대로 초기화, 이전 스텝, 재생, 다음 스텝 버튼입니다.", align: 'top', padding: 5 },
+  { target: '.speed-control-container', text: "재생 속도를 조절할 수 있습니다.", align: 'top', padding: 5 },
+  { target: 'PEOPLE_BBOX', text: "각 아이콘을 클릭하여 집중해서 보고 싶은 사람을 강조 표시할 수 있습니다.", align: 'top', padding: 20 },
+  { target: '#signal-panel', text: "지휘자의 회전, 전진, 정지 신호를 보여 주는 표시기입니다.", align: 'right', padding: 5 },
+  { target: '.mode-overlay', text: "회전 방식을 선택할 수 있습니다.", align: 'bottom', padding: 5 } 
 ];
 
 function startTutorial() {
@@ -1055,7 +1044,6 @@ function nextTutorialStep() {
 function closeTutorial(e) {
   e.stopPropagation();
   document.getElementById('tutorial-overlay').style.display = 'none';
-  try { localStorage.setItem('tutorialSeen', 'true'); } catch(err) {}
 }
 
 function showTutorialStep() {
