@@ -653,8 +653,8 @@ function updateStatusText() {
   } else if (currentMode === 5) {
       if (currentStep === 0) phase = "준비 완료";
       else if (currentStep < 4) phase = "전진 중";
-      else if (currentStep <= 11) phase = "회전 중";
-      else if (currentStep <= 17) phase = "대열 복원 중";
+      else if (currentStep <= 12) phase = "회전 중";
+      else if (currentStep <= 18) phase = "대열 복원 중";
       else if (currentStep < maxSteps) phase = "전진 중";
       else phase = "시뮬레이션 종료";
   }
@@ -865,7 +865,9 @@ function runLogicMode4() {
         if (step < rotStart) {
             p.moveNorth(1.0);
         } else if (step >= rotStart && step <= rotEnd) {
-            let progress = (step - rotStart + 1) / 10;
+            
+            let progress = (step - rotStart + 0.3) / 9.3; 
+            
             let initX = (c - 1.5) * 2; 
             
             let endX_map = {1: 6, 2: 4, 3: 0, 4: -2};
@@ -937,19 +939,21 @@ function runLogicMode5() {
     }
   }
   
-  maxSteps = 19; 
+  maxSteps = 20; 
   for (let step = 1; step <= maxSteps; step++) {
     people.forEach(p => {
         let r = p.xIdx;
         let c = p.yIdx;
         
         let rotStart = 4 + (r - 1) * 2;
-        let rotEnd = rotStart + 1;
+        let rotEnd = rotStart + 2;
 
         if (step < rotStart) {
             p.moveNorth(1.0);
         } else if (step === rotStart) {
             p.y -= 0.25; p.x -= 0.25; p.setAngleSmoothly(-90); p.isMoving = true; p.direction = 'ROTATE';
+        } else if (step === rotStart + 1) {
+            p.x -= 0.5; p.setAngleSmoothly(-90); p.isMoving = true; p.direction = 'WEST'; // 보폭 0.5로 변경
         } else if (step === rotEnd) {
             p.x -= 0.25; p.y += 0.25; p.setAngleSmoothly(-180); p.isMoving = true; p.direction = 'ROTATE';
         } else {
@@ -957,7 +961,7 @@ function runLogicMode5() {
             if (postStep <= 2) {
                 p.y += 1.0; p.setAngleSmoothly(-180); p.isMoving = true; p.direction = 'SOUTH';
             } else if (postStep <= 6) {
-                p.y += 1.0; p.x += 0.125; p.setAngleSmoothly(-180); p.isMoving = true; p.direction = 'DIAGONAL';
+                p.y += 1.0; p.x += 0.25; p.setAngleSmoothly(-180); p.isMoving = true; p.direction = 'DIAGONAL'; // 매 스텝 +0.25 이동 (4스텝 간 총 +1.0 복원)
             } else {
                 p.y += 1.0; p.setAngleSmoothly(-180); p.isMoving = true; p.direction = 'SOUTH';
             }
