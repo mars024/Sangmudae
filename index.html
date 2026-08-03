@@ -80,12 +80,10 @@ body {
   z-index: 10;
 }
 
-/* UI 레이아웃의 투명한 여백 영역 클릭 무시 (SVG 포커스 클릭 허용) */
 .bottom-ui-wrapper, .controls-overlay, #signal-panel, .mode-overlay, .help-btn-container {
   pointer-events: none;
 }
 
-/* 실제 조작이 필요한 버튼, 슬라이더, 튜토리얼은 클릭 활성화 */
 button, input[type=range], #tutorial-overlay {
   pointer-events: auto;
 }
@@ -384,10 +382,10 @@ class Person {
     this.x = initX;
     this.y = initY;
     this.angle = 0;
-    this.isMoving = true;
-    this.direction = 'NORTH';
-    this.currentSpeed = 1; 
-    this.isStopped = false;
+    this.isMoving = false;
+    this.direction = 'STOP';
+    this.currentSpeed = 0; 
+    this.isStopped = true;
     
     this.westStepCount = 0;
     this.northStepCount = 0; 
@@ -411,10 +409,17 @@ class Person {
     }];
   }
 
+  setAngleSmoothly(newAngle) {
+      let diff = newAngle - (this.angle % 360);
+      while (diff > 180) diff -= 360;
+      while (diff <= -180) diff += 360;
+      this.angle += diff;
+  }
+
   moveNorth(speed = 1) {
     this.currentSpeed = speed;
     this.y -= speed; 
-    this.angle = 0;
+    this.setAngleSmoothly(0);
     this.isMoving = true;
     this.isStopped = false;
     this.direction = 'NORTH';
@@ -426,7 +431,7 @@ class Person {
   moveWest(speed = 1) {
     this.currentSpeed = speed;
     this.x -= speed; 
-    this.angle = -90;
+    this.setAngleSmoothly(-90);
     this.isMoving = true;
     this.isStopped = false;
     this.direction = 'WEST';
@@ -439,7 +444,7 @@ class Person {
     this.currentSpeed = speed;
     this.x -= speed;
     this.y -= speed;
-    this.angle = -45; 
+    this.setAngleSmoothly(-45);
     this.isMoving = true;
     this.isStopped = false;
     this.direction = 'NORTHWEST';
@@ -455,7 +460,7 @@ class Person {
 
     this.x = pivotX + radius * Math.cos(currentAngle);
     this.y = pivotY + radius * Math.sin(currentAngle);
-    this.angle = currentAngle * (180 / Math.PI); 
+    this.setAngleSmoothly(currentAngle * (180 / Math.PI)); 
     this.isMoving = true; 
     this.isStopped = false;
     this.direction = 'ARC';
@@ -691,8 +696,8 @@ function runLogicMode1() {
                     p.moveWest(1); 
                     continue;
                 }
-                if (p.westCountDown === 2 && c === 4) {
-                    p.moveNorth(2); 
+                if (c === 4 && (p.westCountDown === 1 || p.westCountDown === 2)) {
+                    p.moveNorth(1.5); 
                     continue;
                 }
                 p.moveNorth(1);
@@ -704,7 +709,7 @@ function runLogicMode1() {
             if (r === 1 && c === 4 && p.westCountDown === -1) {
                 const leftNeighbor = getPerson(r, c - 1);
                 if (leftNeighbor && leftNeighbor.stopCountDown === 1) {
-                    p.moveNorth(2);
+                    p.moveNorth(1.5);
                     continue;
                 }
             }
@@ -719,7 +724,7 @@ function runLogicMode1() {
             if (r === 1) {
                 if (c === 1 && step === 4) { p.stop(); continue; }
                 if (leftNeighbor && leftNeighbor.isStopped && prevLeft && prevLeft.isMoving) {
-                    if (c === 4) { p.westCountDown = 1; p.moveNorth(1); } 
+                    if (c === 4) { p.westCountDown = 1; p.moveNorth(1.5); } 
                     else { p.stopCountDown = 2; p.moveNorth(1); }
                 }
                 else if (rightNeighbor && step >= 2 && rightNeighbor.history[step - 2].direction === 'WEST' && rightNeighbor.westStepCount === 2) {
@@ -733,8 +738,8 @@ function runLogicMode1() {
                 if (getPerson(1, c).isStopped === true) { p.stop(); } 
                 else if (headPerson && prevHead && headPerson.westStepCount >= 1 && prevHead.westStepCount < 1) {
                     p.westCountDown = (r - 1) * 2;
-                    if (p.westCountDown === 2 && c === 4) {
-                        p.moveNorth(2);
+                    if (c === 4 && (p.westCountDown === 1 || p.westCountDown === 2)) {
+                        p.moveNorth(1.5);
                     } else {
                         p.moveNorth(1);
                     }
@@ -842,8 +847,8 @@ function runLogicMode4() {
   people = [];
   for (let r = 1; r <= m; r++) {
     for (let c = 1; c <= n; c++) {
-      let initX = (c - (n + 1) / 2) * 2; 
-      let initY = (r * 2) - 3; 
+      let initX = (c - 1.5) * 2; 
+      let initY = (r * 2) - 1; 
       people.push(new Person(`${r}-${c}`, r, c, initX, initY));
     }
   }
@@ -854,56 +859,65 @@ function runLogicMode4() {
         let r = p.xIdx;
         let c = p.yIdx;
         
-        // 1오(r=1)는 3스텝 이동 후 4스텝부터 회전, 2오 등은 앞사람 도달을 기다려 2스텝 지연
         let rotStart = 4 + (r - 1) * 2;
-        let rotEnd = rotStart + 9; // 총 10스텝 동안 회전 반원 완주
+        let rotEnd = rotStart + 9; 
 
         if (step < rotStart) {
             p.moveNorth(1.0);
         } else if (step >= rotStart && step <= rotEnd) {
             let progress = (step - rotStart + 1) / 10;
-            let initX = (c - 2.5) * 2; // C1: -3, C2: -1, C3: 1, C4: 3
+            let initX = (c - 1.5) * 2; 
             
-            // 모든 열이 좌회전(반시계)하여 좌측(-x 영역)으로 모임 
-            // 3, 2, 4, 1열 순서로 y반경(b)이 커짐으로써 충돌 회피
-            let endX_map = {1: -4, 2: -2, 3: -1, 4: -3};
-            let b_map = {1: 4, 2: 2, 3: 1, 4: 3};
+            let endX_map = {1: 6, 2: 4, 3: 0, 4: -2};
+            let b_base = {3: 1.0, 2: 2.0, 4: 3.0, 1: 4.0}; 
             
             let endX = endX_map[c];
-            let b = b_map[c];
+            let b = b_base[c] + (r - 1) * 0.25; 
             
-            // 반원(pi) 보간
             let theta = Math.PI * progress;
+            let rawAngle = 0;
+
+            if (c === 1 || c === 2) {
+                let centerX = (initX + endX) / 2; 
+                let R_x = (endX - initX) / 2;     
+                
+                p.x = centerX - R_x * Math.cos(theta);
+                p.y = -3 - b * Math.sin(theta);   
+                
+                let dx = R_x * Math.PI * Math.sin(theta);
+                let dy = -b * Math.PI * Math.cos(theta);
+                rawAngle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+            } else {
+                let centerX = (initX + endX) / 2;
+                let R_x = (initX - endX) / 2;
+                
+                p.x = centerX + R_x * Math.cos(theta);
+                p.y = -3 - b * Math.sin(theta);   
+                
+                let dx = -R_x * Math.PI * Math.sin(theta);
+                let dy = -b * Math.PI * Math.cos(theta);
+                rawAngle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+            }
             
-            // x좌표: initX에서 endX로 타원 경로를 그리며 이동
-            p.x = ((initX + endX) / 2) + ((initX - endX) / 2) * Math.cos(theta);
-            // y좌표: 지휘자(y=-4)를 중심으로 아래쪽으로 타원 궤도
-            p.y = -4 - b * Math.sin(theta);
-            
-            // 회전 시 캐릭터의 시선(각도) 계산 (궤도의 접선 방향)
-            let dx = -((initX - endX) / 2) * Math.sin(theta) * (Math.PI / 10);
-            let dy = -b * Math.cos(theta) * (Math.PI / 10);
-            p.angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
-            p.isMoving = true; 
+            p.setAngleSmoothly(rawAngle);
+            p.isMoving = true;
             p.direction = 'ROTATE';
         } else {
             let postStep = step - rotEnd;
             if (postStep <= 4) {
-                // 회전 완료 후 원래 열 간격으로 복원 대각이동 (좌우 반전된 위치)
-                let targetX_map = {1: 3, 2: 1, 3: -1, 4: -3};
+                let targetX_map = {1: 5, 2: 3, 3: 1, 4: -1};
                 let targetX = targetX_map[c];
-                let endX = {1: -4, 2: -2, 3: -1, 4: -3}[c];
-                let shift_dx = (targetX - endX) / 4;
+                let endX = {1: 6, 2: 4, 3: 0, 4: -2}[c]; 
+                let shift_dx = (targetX - endX) / 4; 
                 
                 p.y += 1.0; 
                 p.x += shift_dx; 
-                p.angle = -180; // 방향은 정남향 고정
+                p.setAngleSmoothly(-180); 
                 p.isMoving = true; 
-                p.direction = 'SOUTHEAST';
+                p.direction = 'DIAGONAL'; 
             } else {
-                // 복원 완료 후 직진(남향)하고 2스텝 뒤 시뮬레이션 최종 종료
                 p.y += 1.0; 
-                p.angle = -180; 
+                p.setAngleSmoothly(-180); 
                 p.isMoving = true; 
                 p.direction = 'SOUTH';
             }
@@ -917,8 +931,8 @@ function runLogicMode5() {
   people = [];
   for (let r = 1; r <= m; r++) {
     for (let c = 1; c <= n; c++) {
-      let initX = (c - (n + 1) / 2) * 2; 
-      let initY = (r * 2) - 3; 
+      let initX = (c - 1.5) * 2; 
+      let initY = (r * 2) - 1; 
       people.push(new Person(`${r}-${c}`, r, c, initX, initY));
     }
   }
@@ -935,17 +949,17 @@ function runLogicMode5() {
         if (step < rotStart) {
             p.moveNorth(1.0);
         } else if (step === rotStart) {
-            p.y -= 0.25; p.x -= 0.25; p.angle = -90; p.isMoving = true; p.direction = 'ROTATE';
+            p.y -= 0.25; p.x -= 0.25; p.setAngleSmoothly(-90); p.isMoving = true; p.direction = 'ROTATE';
         } else if (step === rotEnd) {
-            p.x -= 0.25; p.y += 0.25; p.angle = -180; p.isMoving = true; p.direction = 'ROTATE';
+            p.x -= 0.25; p.y += 0.25; p.setAngleSmoothly(-180); p.isMoving = true; p.direction = 'ROTATE';
         } else {
             let postStep = step - rotEnd;
             if (postStep <= 2) {
-                p.y += 1.0; p.angle = -180; p.isMoving = true; p.direction = 'SOUTH';
+                p.y += 1.0; p.setAngleSmoothly(-180); p.isMoving = true; p.direction = 'SOUTH';
             } else if (postStep <= 6) {
-                p.y += 1.0; p.x += 0.125; p.angle = -180; p.isMoving = true; p.direction = 'SOUTHEAST';
+                p.y += 1.0; p.x += 0.125; p.setAngleSmoothly(-180); p.isMoving = true; p.direction = 'DIAGONAL';
             } else {
-                p.y += 1.0; p.angle = -180; p.isMoving = true; p.direction = 'SOUTH';
+                p.y += 1.0; p.setAngleSmoothly(-180); p.isMoving = true; p.direction = 'SOUTH';
             }
         }
         p.recordHistory();
@@ -964,31 +978,31 @@ function render(isInitialBuild = false) {
   const cellSize = targetSubwayLength / (initialSpan > 0 ? initialSpan : 1);
   const radius = cellSize * 0.45; 
 
-  // 하단 조작부 레이아웃의 실질적 높이를 계산하여 카메라가 이를 침범하지 않도록 유효 높이 설정
   const bottomUI = document.querySelector('.bottom-ui-wrapper');
   const bottomOffset = bottomUI ? bottomUI.offsetHeight + 16 : 220; 
   const effectiveHeight = height - bottomOffset;
 
   let baseOriginX = (width / 2) - (2 * cellSize);
-  let baseOriginY = (effectiveHeight / 2) - (1 * cellSize);
-  
-  if (currentMode === 4 || currentMode === 5) {
-      baseOriginX = width / 2;
-      baseOriginY = effectiveHeight / 2;
-  }
+  let targetYRatio = (currentMode === 4 || currentMode === 5) ? 0.625 : 0.75;
+  let initialCenterY = (currentMode === 4 || currentMode === 5) ? (2 * cellSize) : (5 * cellSize);
+
+  let baseOriginY = (effectiveHeight * targetYRatio) - initialCenterY;
 
   let cameraOffsetX = 0;
   let cameraOffsetY = 0;
   const marginX = width * 0.125;
-  const marginY = effectiveHeight * 0.125;
+  const marginTop = effectiveHeight * 0.15;
+  const marginBottom = effectiveHeight * 0.02;
 
   for (let i = 0; i <= currentStep; i++) {
     let stepMinX = Infinity, stepMaxX = -Infinity;
     let stepMinY = Infinity, stepMaxY = -Infinity;
+    let hasMoving = false;
     
     people.forEach(p => {
       const state = p.history[i];
-      if (state) {
+      if (state && state.isMoving) {
+        hasMoving = true;
         stepMinX = Math.min(stepMinX, state.x * cellSize);
         stepMaxX = Math.max(stepMaxX, state.x * cellSize);
         stepMinY = Math.min(stepMinY, state.y * cellSize);
@@ -996,22 +1010,28 @@ function render(isInitialBuild = false) {
       }
     });
 
-    if ((stepMaxX - stepMinX) > (width - marginX * 2)) {
-       cameraOffsetX = (width / 2) - baseOriginX - ((stepMinX + stepMaxX) / 2);
-    } else {
-       let sMinX = baseOriginX + stepMinX + cameraOffsetX;
-       let sMaxX = baseOriginX + stepMaxX + cameraOffsetX;
-       if (sMinX < marginX) cameraOffsetX += (marginX - sMinX);
-       else if (sMaxX > width - marginX) cameraOffsetX += ((width - marginX) - sMaxX);
-    }
+    if (!hasMoving) continue;
 
-    if ((stepMaxY - stepMinY) > (effectiveHeight - marginY * 2)) {
-       cameraOffsetY = (effectiveHeight / 2) - baseOriginY - ((stepMinY + stepMaxY) / 2);
-    } else {
-       let sMinY = baseOriginY + stepMinY + cameraOffsetY;
-       let sMaxY = baseOriginY + stepMaxY + cameraOffsetY;
-       if (sMinY < marginY) cameraOffsetY += (marginY - sMinY);
-       else if (sMaxY > effectiveHeight - marginY) cameraOffsetY += ((effectiveHeight - marginY) - sMaxY);
+    let sMinX = baseOriginX + stepMinX + cameraOffsetX;
+    let sMaxX = baseOriginX + stepMaxX + cameraOffsetX;
+    let sMinY = baseOriginY + stepMinY + cameraOffsetY;
+    let sMaxY = baseOriginY + stepMaxY + cameraOffsetY;
+
+    let adjustTop = sMinY < marginTop ? (marginTop - sMinY) : 0;
+    let adjustBottom = sMaxY > effectiveHeight - marginBottom ? ((effectiveHeight - marginBottom) - sMaxY) : 0;
+    let adjustLeft = sMinX < marginX ? (marginX - sMinX) : 0;
+    let adjustRight = sMaxX > width - marginX ? ((width - marginX) - sMaxX) : 0;
+
+    if (adjustTop !== 0 && adjustBottom !== 0) {
+      cameraOffsetY += adjustTop; 
+    } else if (adjustTop !== 0) {
+      cameraOffsetY += adjustTop;
+    } else if (adjustLeft !== 0) {
+      cameraOffsetX += adjustLeft;
+    } else if (adjustBottom !== 0) {
+      cameraOffsetY += adjustBottom;
+    } else if (adjustRight !== 0) {
+      cameraOffsetX += adjustRight;
     }
   }
 
@@ -1045,7 +1065,9 @@ function render(isInitialBuild = false) {
     landmarksGroup.setAttribute('id', 'bg-landmarks');
     cameraGroup.appendChild(landmarksGroup);
 
-    people.forEach(p => {
+    const sortedPeople = [...people].sort((a, b) => b.xIdx - a.xIdx);
+
+    sortedPeople.forEach(p => {
       const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       g.setAttribute('id', `person-${p.id}`);
       g.setAttribute('class', 'person-group');
@@ -1090,7 +1112,6 @@ function render(isInitialBuild = false) {
   const landmarksGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   const existingLandmarks = svg.querySelector('#bg-landmarks');
   
-  // 모든 모드에서 배경 폴리곤 및 지휘자 표시
   if (existingLandmarks) {
     existingLandmarks.innerHTML = `
       <polygon points="${cellSize * 3},${-cellSize * 6} 
@@ -1109,10 +1130,9 @@ function render(isInitialBuild = false) {
             stroke-dasharray="5 5"/>
     `;
     
-    // 4번, 5번 모드일 경우에만 지휘자 및 무한 점선 추가
     if (currentMode === 4 || currentMode === 5) {
-        let cx = 0;
-        let cy = -4 * cellSize;
+        let cx = 2 * cellSize;
+        let cy = -3 * cellSize;
         existingLandmarks.innerHTML += `
            <line x1="${cx}" y1="-10000" x2="${cx}" y2="10000" stroke="var(--color-stop)" stroke-width="2" stroke-dasharray="6 6" opacity="0.4" />
            <circle cx="${cx}" cy="${cy}" r="${radius * 1.2}" fill="var(--color-stop)" stroke="var(--color-bg)" stroke-width="2" />
@@ -1121,7 +1141,9 @@ function render(isInitialBuild = false) {
     }
   }
 
-  people.forEach(p => {
+  const sortedPeople = [...people].sort((a, b) => b.xIdx - a.xIdx);
+
+  sortedPeople.forEach(p => {
     const g = document.getElementById(`person-${p.id}`);
     if (!g) return;
     const state = p.history[currentStep];
@@ -1161,7 +1183,24 @@ function render(isInitialBuild = false) {
 
     let activeFoot = 'none';
     if (currentStep > 0) {
-      activeFoot = (currentStep % 2 === 1) ? 'left' : 'right';
+      if (state.isMoving) {
+        activeFoot = (currentStep % 2 === 1) ? 'left' : 'right';
+      } else {
+        const nextState = p.history[currentStep + 1];
+        if (nextState && nextState.isMoving) {
+          if (currentStep % 2 === 0) {
+            activeFoot = 'left';
+          } else {
+            activeFoot = 'none';
+          }
+        } else {
+          if (currentStep % 2 === 1) {
+            activeFoot = 'left';
+          } else {
+            activeFoot = 'none';
+          }
+        }
+      }
     }
 
     const baseColor = 'var(--color-accent)';
@@ -1230,7 +1269,6 @@ function stopPlay() {
   document.getElementById('play-btn').classList.remove('playing');
 }
 
-/* 튜토리얼 로직 */
 let currentTutStep = 0;
 const tutSteps = [
   { target: '.controls-overlay', text: "시뮬레이션 조작 패널입니다. 좌측부터 순서대로 초기화, 이전 스텝, 재생, 다음 스텝 버튼입니다.", align: 'top', padding: 5 },
