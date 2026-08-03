@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>ATT 행진 좌회전 시뮬레이터</title>
+<title>ATT 행진 시뮬레이터</title>
 <style>
 :root {
   --color-bg: #121212;         
@@ -78,6 +78,16 @@ body {
   align-items: flex-start;
   gap: 12px;
   z-index: 10;
+}
+
+/* UI 레이아웃의 투명한 여백 영역 클릭 무시 (SVG 포커스 클릭 허용) */
+.bottom-ui-wrapper, .controls-overlay, #signal-panel, .mode-overlay, .help-btn-container {
+  pointer-events: none;
+}
+
+/* 실제 조작이 필요한 버튼, 슬라이더, 튜토리얼은 클릭 활성화 */
+button, input[type=range], #tutorial-overlay {
+  pointer-events: auto;
 }
 
 #signal-panel {
@@ -159,8 +169,8 @@ body {
 .mode-buttons-group { display: flex; gap: 6px; }
 
 .square-mode-btn {
-  width: 36px; height: 36px; background: transparent; border: none;
-  color: var(--color-text); opacity: 0.6; font-size: 15px; font-weight: bold;
+  width: 32px; height: 32px; background: transparent; border: none;
+  color: var(--color-text); opacity: 0.6; font-size: 14px; font-weight: bold;
   border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;
   transition: all 0.2s ease;
 }
@@ -176,7 +186,6 @@ body {
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
 }
 
-/* 프로그레스 바 스타일 추가 */
 .progress-container { width: 100%; display: flex; flex-direction: column; margin-bottom: 4px; }
 .progress-header { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 8px; }
 #phase-info { font-size: 14px; font-weight: bold; color: var(--color-new); text-align: left; }
@@ -206,8 +215,8 @@ input[type=range]::-webkit-slider-thumb { height: 16px; width: 16px; border-radi
 .btn-square.btn-play { background-color: var(--color-new); color: var(--color-bg); border: none; }
 .btn-square.btn-play.playing { background-color: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-surface); }
 
-#end-message { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 15; }
-#end-message button { width: 72px; height: 72px; border-radius: 50%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); padding: 0; display: flex; align-items: center; justify-content: center; }
+#end-message { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 15; pointer-events: none; }
+#end-message button { width: 72px; height: 72px; border-radius: 50%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); padding: 0; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
 
 #camera-group, .person-group { 
   transform-origin: 0px 0px; 
@@ -215,6 +224,11 @@ input[type=range]::-webkit-slider-thumb { height: 16px; width: 16px; border-radi
 }
 .foot-path { 
   transition: fill var(--transition-duration) ease, stroke var(--transition-duration) ease, stroke-width var(--transition-duration) ease; 
+}
+
+.hitbox {
+  fill: transparent;
+  pointer-events: all;
 }
 
 #tutorial-overlay { position: fixed; inset: 0; z-index: 9999; display: none; cursor: pointer; }
@@ -230,7 +244,7 @@ input[type=range]::-webkit-slider-thumb { height: 16px; width: 16px; border-radi
   .controls-overlay { padding: 12px; }
   .btn-square { width: 40px; height: 40px; }
   .mode-overlay { top: 8px; right: 8px; padding: 4px 6px; }
-  .square-mode-btn { width: 32px; height: 32px; font-size: 13px; }
+  .square-mode-btn { width: 28px; height: 28px; font-size: 12px; }
 }
 </style>
 </head>
@@ -258,6 +272,8 @@ input[type=range]::-webkit-slider-thumb { height: 16px; width: 16px; border-radi
         <button class="square-mode-btn active" id="mode-btn-1" onclick="setMode(1)">1</button>
         <button class="square-mode-btn" id="mode-btn-2" onclick="setMode(2)">2</button>
         <button class="square-mode-btn" id="mode-btn-3" onclick="setMode(3)">3</button>
+        <button class="square-mode-btn" id="mode-btn-4" onclick="setMode(4)">4</button>
+        <button class="square-mode-btn" id="mode-btn-5" onclick="setMode(5)">5</button>
       </div>
     </div>
 
@@ -298,7 +314,6 @@ input[type=range]::-webkit-slider-thumb { height: 16px; width: 16px; border-radi
 
       <div class="controls-overlay">
         
-        <!-- 변경된 프로그레스 바 영역 -->
         <div class="progress-container">
           <div class="progress-header">
             <div id="phase-info">준비 완료</div>
@@ -484,7 +499,6 @@ function init() {
   buildSimulation();
   window.addEventListener('resize', () => render(false));
   
-  // 🌟 항상 튜토리얼 표시
   setTimeout(startTutorial, 500);
 }
 
@@ -502,9 +516,10 @@ function updateSpeed() {
 
 function setMode(mode) {
   currentMode = mode;
-  document.getElementById('mode-btn-1').classList.toggle('active', mode === 1);
-  document.getElementById('mode-btn-2').classList.toggle('active', mode === 2);
-  document.getElementById('mode-btn-3').classList.toggle('active', mode === 3);
+  for(let i=1; i<=5; i++) {
+    const btn = document.getElementById(`mode-btn-${i}`);
+    if (btn) btn.classList.toggle('active', mode === i);
+  }
   resetSim();
 }
 
@@ -515,6 +530,8 @@ function buildSimulation() {
   if (currentMode === 1) runLogicMode1();
   else if (currentMode === 2) runLogicMode2(); 
   else if (currentMode === 3) runLogicMode3(); 
+  else if (currentMode === 4) runLogicMode4(); 
+  else if (currentMode === 5) runLogicMode5(); 
 
   document.getElementById('total-steps').innerText = maxSteps;
   updateStatusText();
@@ -525,7 +542,9 @@ function updateSignal(step, mode) {
   const signals = {
       1: [ {type: 'ROTATE', t: 3} ],
       2: [ {type: 'ROTATE', t: 3}, {type: 'STOP', t: 19}, {type: 'FORWARD', t: 29} ],
-      3: [ {type: 'ROTATE', t: 5} ]
+      3: [ {type: 'ROTATE', t: 5} ],
+      4: [ {type: 'ROTATE', t: 3} ], 
+      5: [ {type: 'ROTATE', t: 3} ]  
   };
 
   let activeSig = null;
@@ -615,15 +634,24 @@ function updateStatusText() {
   } else if (currentMode === 3) {
       if (currentStep === 0) phase = "준비 완료";
       else if (currentStep <= 4) phase = "전진 중";
-      else if (currentStep < 42) phase = "회전 중";
-      else if (currentStep <= 44) phase = "회전 완료";
-      else if (currentStep === 45) phase = "전진 중";
+      else if (currentStep < 36) phase = "회전 중";
+      else if (currentStep === 36) phase = "회전 완료";
+      else if (currentStep <= maxSteps) phase = "전진 중";
+      else phase = "시뮬레이션 종료";
+  } else if (currentMode === 4) {
+      if (currentStep === 0) phase = "준비 완료";
+      else phase = "시뮬레이션 종료";
+  } else if (currentMode === 5) {
+      if (currentStep === 0) phase = "준비 완료";
+      else if (currentStep < 4) phase = "전진 중";
+      else if (currentStep <= 11) phase = "회전 중";
+      else if (currentStep <= 17) phase = "대열 복원 중";
+      else if (currentStep < maxSteps) phase = "전진 중";
       else phase = "시뮬레이션 종료";
   }
   document.getElementById('phase-info').innerText = phase;
   updateSignal(currentStep, currentMode);
 
-  // 프로그레스 바 너비 업데이트
   const progressFill = document.getElementById('progress-fill');
   if (progressFill) {
       const percentage = maxSteps > 0 ? (currentStep / maxSteps) * 100 : 0;
@@ -652,11 +680,27 @@ function runLogicMode1() {
                 p.stopCountDown -= 1;
                 if (p.stopCountDown === 0) { p.stop(); continue; }
             }
+            
             if (p.westCountDown > 0) {
                 p.westCountDown -= 1;
                 if(p.westCountDown === 0) {
-                    if (c === 4) p.moveNorth();
-                    p.moveWest();
+                    p.moveWest(1); 
+                    continue;
+                }
+                if (p.westCountDown === 2 && c === 4) {
+                    p.moveNorth(2); 
+                    continue;
+                }
+                p.moveNorth(1);
+                continue;
+            }
+
+            if (step <= 3) { p.moveNorth(1); continue; }
+
+            if (r === 1 && c === 4 && p.westCountDown === -1) {
+                const leftNeighbor = getPerson(r, c - 1);
+                if (leftNeighbor && leftNeighbor.stopCountDown === 1) {
+                    p.moveNorth(2);
                     continue;
                 }
             }
@@ -668,16 +712,14 @@ function runLogicMode1() {
             const prevHead = headPerson ? headPerson.history[step - 1] : null;
             const prevLeft = leftNeighbor ? leftNeighbor.history[step - 1] : null;
 
-            if (step <= 3) { p.moveNorth(); continue; }
-
             if (r === 1) {
                 if (c === 1 && step === 4) { p.stop(); continue; }
                 if (leftNeighbor && leftNeighbor.isStopped && prevLeft && prevLeft.isMoving) {
-                    if (c === n) { p.westCountDown = 1; p.moveNorth(); } 
-                    else { p.stopCountDown = 2; p.moveNorth(); }
+                    if (c === 4) { p.westCountDown = 1; p.moveNorth(1); } 
+                    else { p.stopCountDown = 2; p.moveNorth(1); }
                 }
                 else if (rightNeighbor && step >= 2 && rightNeighbor.history[step - 2].direction === 'WEST' && rightNeighbor.westStepCount === 2) {
-                    p.moveWest(); 
+                    p.moveWest(1); 
                 }
                 else {
                     const prevSelf = p.history[step - 1];
@@ -687,7 +729,11 @@ function runLogicMode1() {
                 if (getPerson(1, c).isStopped === true) { p.stop(); } 
                 else if (headPerson && prevHead && headPerson.westStepCount >= 1 && prevHead.westStepCount < 1) {
                     p.westCountDown = (r - 1) * 2;
-                    p.moveNorth();
+                    if (p.westCountDown === 2 && c === 4) {
+                        p.moveNorth(2);
+                    } else {
+                        p.moveNorth(1);
+                    }
                 } else {
                     const prevSelf = p.history[step - 1];
                     if (prevSelf) p.repeatLastCommand();
@@ -725,16 +771,19 @@ function runLogicMode2() {
                 else p.moveWest(0.5); 
             }
         } 
-        else if (step === 20) { p.stop(); }
-        else if (step === 21) { if (c === 2) p.moveWest(1.0); else p.stop(); }
-        else if (step === 22) { p.stop(); }
-        else if (step === 23) { if (c === 3) p.moveWest(2.0); else p.stop(); }
-        else if (step === 24) { p.stop(); }
-        else if (step === 25) { if (c === 4) p.moveWest(3.0); else p.stop(); }
-        else if (step === 26) { p.stop(); }
-        else if (step >= 27 && step <= 30) { p.stop(); } 
-        else if (step >= 31 && step <= 34) { p.moveWest(0.5); } 
-
+        else {
+            let myStopStep = 20 + (c - 1) * 2;
+            
+            if (step < myStopStep) {
+                p.moveWest(0.5); 
+            } else if (step === myStopStep) {
+                p.stop();
+            } else if (step <= 28) {
+                p.stop();
+            } else {
+                p.moveWest(0.5); 
+            }
+        }
         p.recordHistory();
     });
   }
@@ -747,41 +796,103 @@ function runLogicMode3() {
       people.push(new Person(`${r}-${c}`, r, c, c * 2, r * 2));
     }
   }
-  maxSteps = 46; 
+  
+  maxSteps = 38; 
 
   for (let step = 1; step <= maxSteps; step++) {
     people.forEach(p => {
         let r = p.xIdx;
         let c = p.yIdx;
 
-        let rotStart = 5 + (r - 1) * 10;
+        let rotStart = 5 + (r - 1) * 8; 
         let rotEnd = rotStart + 7; 
 
         if (step <= 4) {
             p.moveNorth(1.0);
         } 
-        else if (step >= 5 && step <= 44) {
-            if (step >= rotStart && step <= rotEnd) {
+        else if (step <= 36) {
+            if (step < rotStart) {
+                p.moveNorth(0.25); 
+            } 
+            else if (step >= rotStart && step <= rotEnd) {
                 let progress = (step - rotStart + 1) / 8; 
                 let pivotX = 2; 
                 let pivotY = -2; 
                 let radius = (c - 1) * 2;
                 p.arc(pivotX, pivotY, radius, progress);
             } 
-            else if (step < rotStart) {
-                let cycleStep = (step - 5) % 10;
-                if (cycleStep === 8 || cycleStep === 9) p.moveNorth(1.0);
-                else p.stop(); 
-            } 
-            else if (step > rotEnd) {
-                let cycleStep = (step - 5) % 10;
-                if (cycleStep === 8 || cycleStep === 9) p.moveWest(1.0);
-                else p.stop();
+            else {
+                p.moveWest(0.25); 
             }
         } 
-        else if (step === 45) { p.moveWest(1.0); } 
-        else { p.stop(); }
+        else { 
+            p.moveWest(1.0); 
+        }
 
+        p.recordHistory();
+    });
+  }
+}
+
+function runLogicMode4() {
+  people = [];
+  for (let r = 1; r <= m; r++) {
+    for (let c = 1; c <= n; c++) {
+      let initX = (c - (n + 1) / 2) * 2; 
+      let initY = (r * 2) - 3; 
+      people.push(new Person(`${r}-${c}`, r, c, initX, initY));
+    }
+  }
+  maxSteps = 20; 
+  for (let step = 1; step <= maxSteps; step++) {
+    people.forEach(p => {
+        p.stop(); 
+        p.recordHistory();
+    });
+  }
+}
+
+function runLogicMode5() {
+  people = [];
+  for (let r = 1; r <= m; r++) {
+    for (let c = 1; c <= n; c++) {
+      let initX = (c - (n + 1) / 2) * 2; 
+      let initY = (r * 2) - 3; 
+      people.push(new Person(`${r}-${c}`, r, c, initX, initY));
+    }
+  }
+  
+  maxSteps = 19; 
+  for (let step = 1; step <= maxSteps; step++) {
+    people.forEach(p => {
+        let r = p.xIdx;
+        let c = p.yIdx;
+        
+        let rotStart = 4 + (r - 1) * 2;
+        let rotEnd = rotStart + 1;
+
+        if (step < rotStart) {
+            p.moveNorth(1.0);
+        } else if (step === rotStart) {
+            // 0.25보 전진 + 좌회전 (90도)
+            p.y -= 0.25; p.x -= 0.25; p.angle = -90; p.isMoving = true; p.direction = 'ROTATE';
+        } else if (step === rotEnd) {
+            // 0.25보 전진 + 좌회전 (180도) -> 총 x축으로 0.5보 이동됨
+            p.x -= 0.25; p.y += 0.25; p.angle = -180; p.isMoving = true; p.direction = 'ROTATE';
+        } else {
+            let postStep = step - rotEnd;
+            if (postStep <= 2) {
+                // 회전 직후 2스텝은 그대로 직진(남쪽)
+                p.y += 1.0; p.angle = -180; p.isMoving = true; p.direction = 'SOUTH';
+            } else if (postStep <= 6) {
+                // 이후 4스텝 동안 조금씩 우 대각선으로 꺾어서 원래 x좌표로 복원 
+                // 회전 반경이 줄어들어 x축 이동이 0.5보뿐이므로 스텝당 0.125씩 4번 복원
+                p.y += 1.0; p.x += 0.125; p.angle = -180; p.isMoving = true; p.direction = 'SOUTHEAST';
+            } else {
+                // 복원 완료 후 다시 2스텝 직진(남쪽)하고 종료
+                p.y += 1.0; p.angle = -180; p.isMoving = true; p.direction = 'SOUTH';
+            }
+        }
         p.recordHistory();
     });
   }
@@ -798,13 +909,23 @@ function render(isInitialBuild = false) {
   const cellSize = targetSubwayLength / (initialSpan > 0 ? initialSpan : 1);
   const radius = cellSize * 0.45; 
 
+  // 하단 조작부 레이아웃의 실질적 높이를 계산하여 카메라가 이를 침범하지 않도록 유효 높이 설정
+  const bottomUI = document.querySelector('.bottom-ui-wrapper');
+  const bottomOffset = bottomUI ? bottomUI.offsetHeight + 16 : 220; 
+  const effectiveHeight = height - bottomOffset;
+
   let baseOriginX = (width / 2) - (2 * cellSize);
-  let baseOriginY = (height / 2) - (1 * cellSize);
+  let baseOriginY = (effectiveHeight / 2) - (1 * cellSize);
+  
+  if (currentMode === 4 || currentMode === 5) {
+      baseOriginX = width / 2;
+      baseOriginY = effectiveHeight / 2;
+  }
 
   let cameraOffsetX = 0;
   let cameraOffsetY = 0;
   const marginX = width * 0.125;
-  const marginY = height * 0.125;
+  const marginY = effectiveHeight * 0.125;
 
   for (let i = 0; i <= currentStep; i++) {
     let stepMinX = Infinity, stepMaxX = -Infinity;
@@ -829,13 +950,13 @@ function render(isInitialBuild = false) {
        else if (sMaxX > width - marginX) cameraOffsetX += ((width - marginX) - sMaxX);
     }
 
-    if ((stepMaxY - stepMinY) > (height - marginY * 2)) {
-       cameraOffsetY = (height / 2) - baseOriginY - ((stepMinY + stepMaxY) / 2);
+    if ((stepMaxY - stepMinY) > (effectiveHeight - marginY * 2)) {
+       cameraOffsetY = (effectiveHeight / 2) - baseOriginY - ((stepMinY + stepMaxY) / 2);
     } else {
        let sMinY = baseOriginY + stepMinY + cameraOffsetY;
        let sMaxY = baseOriginY + stepMaxY + cameraOffsetY;
        if (sMinY < marginY) cameraOffsetY += (marginY - sMinY);
-       else if (sMaxY > height - marginY) cameraOffsetY += ((height - marginY) - sMaxY);
+       else if (sMaxY > effectiveHeight - marginY) cameraOffsetY += ((effectiveHeight - marginY) - sMaxY);
     }
   }
 
@@ -876,6 +997,9 @@ function render(isInitialBuild = false) {
       g.style.cursor = 'pointer';
       g.onclick = () => toggleHighlight(p.id);
 
+      const hitbox = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      hitbox.setAttribute('class', 'hitbox');
+
       const leftFoot = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       leftFoot.setAttribute('class', 'foot-path left-foot');
       const rightFoot = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -885,6 +1009,7 @@ function render(isInitialBuild = false) {
       const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       arrow.setAttribute('class', 'arrow-path');
 
+      g.appendChild(hitbox); 
       g.appendChild(leftFoot);
       g.appendChild(rightFoot);
       g.appendChild(centerLine);
@@ -909,6 +1034,8 @@ function render(isInitialBuild = false) {
 
   const landmarksGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   const existingLandmarks = svg.querySelector('#bg-landmarks');
+  
+  // 모든 모드에서 배경 폴리곤 및 지휘자 표시
   if (existingLandmarks) {
     existingLandmarks.innerHTML = `
       <polygon points="${cellSize * 3},${-cellSize * 6} 
@@ -926,6 +1053,17 @@ function render(isInitialBuild = false) {
             stroke-width="2.5" 
             stroke-dasharray="5 5"/>
     `;
+    
+    // 4번, 5번 모드일 경우에만 지휘자 및 무한 점선 추가
+    if (currentMode === 4 || currentMode === 5) {
+        let cx = 0;
+        let cy = -4 * cellSize;
+        existingLandmarks.innerHTML += `
+           <line x1="${cx}" y1="-10000" x2="${cx}" y2="10000" stroke="var(--color-stop)" stroke-width="2" stroke-dasharray="6 6" opacity="0.4" />
+           <circle cx="${cx}" cy="${cy}" r="${radius * 1.2}" fill="var(--color-stop)" stroke="var(--color-bg)" stroke-width="2" />
+           <text x="${cx}" y="${cy}" dy=".3em" fill="var(--color-bg)" font-size="${radius*0.55}px" font-weight="900" text-anchor="middle" style="pointer-events:none; font-family:sans-serif;">지휘자</text>
+        `;
+    }
   }
 
   people.forEach(p => {
@@ -940,11 +1078,18 @@ function render(isInitialBuild = false) {
     g.style.transform = `translate3d(${cx}px, ${cy}px, 0) rotate(${state.angle}deg)`;
     g.style.webkitTransform = `translate3d(${cx}px, ${cy}px, 0) rotate(${state.angle}deg)`;
 
+    const hitbox = g.querySelector('.hitbox');
     const isHighlighted = (p.id === highlightedId);
     const leftFoot = g.querySelector('.left-foot');
     const rightFoot = g.querySelector('.right-foot');
     const centerLine = g.querySelector('.center-line');
     const arrow = g.querySelector('.arrow-path');
+
+    if (hitbox) {
+      hitbox.setAttribute('cx', '0');
+      hitbox.setAttribute('cy', '0');
+      hitbox.setAttribute('r', `${radius * 2.5}`);
+    }
 
     leftFoot.setAttribute('d', `M 0 ${-radius} A ${radius} ${radius} 0 0 0 0 ${radius}`);
     rightFoot.setAttribute('d', `M 0 ${-radius} A ${radius} ${radius} 0 0 1 0 ${radius}`);
@@ -961,14 +1106,7 @@ function render(isInitialBuild = false) {
 
     let activeFoot = 'none';
     if (currentStep > 0) {
-      if (state.isMoving) {
-        activeFoot = (currentStep % 2 === 1) ? 'left' : 'right';
-      } else {
-        const nextState = p.history[currentStep + 1];
-        if (nextState && nextState.isMoving) {
-          activeFoot = 'left';
-        }
-      }
+      activeFoot = (currentStep % 2 === 1) ? 'left' : 'right';
     }
 
     const baseColor = 'var(--color-accent)';
