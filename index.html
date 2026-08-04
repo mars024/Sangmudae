@@ -953,7 +953,7 @@ function runLogicMode5() {
         } else if (step === rotStart) {
             p.y -= 0.25; p.x -= 0.25; p.setAngleSmoothly(-90); p.isMoving = true; p.direction = 'ROTATE';
         } else if (step === rotStart + 1) {
-            p.x -= 0.5; p.setAngleSmoothly(-90); p.isMoving = true; p.direction = 'WEST'; // 보폭 0.5로 변경
+            p.x -= 0.5; p.setAngleSmoothly(-90); p.isMoving = true; p.direction = 'WEST'; 
         } else if (step === rotEnd) {
             p.x -= 0.25; p.y += 0.25; p.setAngleSmoothly(-180); p.isMoving = true; p.direction = 'ROTATE';
         } else {
@@ -961,7 +961,7 @@ function runLogicMode5() {
             if (postStep <= 2) {
                 p.y += 1.0; p.setAngleSmoothly(-180); p.isMoving = true; p.direction = 'SOUTH';
             } else if (postStep <= 6) {
-                p.y += 1.0; p.x += 0.25; p.setAngleSmoothly(-180); p.isMoving = true; p.direction = 'DIAGONAL'; // 매 스텝 +0.25 이동 (4스텝 간 총 +1.0 복원)
+                p.y += 1.0; p.x += 0.25; p.setAngleSmoothly(-180); p.isMoving = true; p.direction = 'DIAGONAL'; 
             } else {
                 p.y += 1.0; p.setAngleSmoothly(-180); p.isMoving = true; p.direction = 'SOUTH';
             }
@@ -995,7 +995,17 @@ function render(isInitialBuild = false) {
   let cameraOffsetX = 0;
   let cameraOffsetY = 0;
   const marginX = width * 0.125;
-  const marginTop = effectiveHeight * 0.15;
+  
+  // UI 요소(회전 방식 선택 박스) 하단을 기준으로 marginTop 동적 계산
+  let marginTop = effectiveHeight * 0.15; // 기본값
+  const modeOverlay = document.querySelector('.mode-overlay');
+  if (modeOverlay) {
+    const overlayRect = modeOverlay.getBoundingClientRect();
+    const svgRect = svg.getBoundingClientRect();
+    // 모드 오버레이 UI의 하단선 + 여유공간(20px) 설정
+    marginTop = Math.max(0, overlayRect.bottom - svgRect.top) + 20;
+  }
+  
   const marginBottom = effectiveHeight * 0.02;
 
   for (let i = 0; i <= currentStep; i++) {
