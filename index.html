@@ -785,9 +785,7 @@ function runLogicMode2() {
             
             if (step < myStopStep) {
                 p.moveWest(0.5); 
-            } else if (step === myStopStep) {
-                p.stop();
-            } else if (step <= myStopStep + 8) {
+            } else if (step <= 32) {
                 p.stop();
             } else {
                 p.moveWest(0.5); 
