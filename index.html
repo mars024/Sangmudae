@@ -358,11 +358,11 @@ input[type=range]::-webkit-slider-thumb { height: 16px; width: 16px; border-radi
 </div>
 
 <script>
-let m = 4; 
-let n = 4; 
+let m = 6; // 6오 (세로 행)
+let n = 4; // 4열 (가로 행)
 let currentMode = 1; 
 let currentStep = 0;
-let maxSteps = 22;
+let maxSteps = 26;
 let highlightedId = null;
 
 let isPlaying = false;
@@ -626,35 +626,35 @@ function updateStatusText() {
   if (currentMode === 1) {
       if (currentStep === 0) phase = "준비 완료";
       else if (currentStep <= 3) phase = "전진 중";
-      else if (currentStep < 21) phase = "회전 중";
-      else if (currentStep === 21) phase = "회전 완료";
+      else if (currentStep < 25) phase = "회전 중";
+      else if (currentStep === 25) phase = "회전 완료";
       else phase = "시뮬레이션 종료";
   } else if (currentMode === 2) {
       if (currentStep === 0) phase = "준비 완료";
       else if (currentStep <= 4) phase = "전진 중";
-      else if (currentStep < 26) phase = "회전 중";
-      else if (currentStep <= 28) phase = "회전 완료";
+      else if (currentStep < 30) phase = "회전 중";
+      else if (currentStep <= 32) phase = "회전 완료";
       else if (currentStep < maxSteps) phase = "전진 중";
       else phase = "시뮬레이션 종료";
   } else if (currentMode === 3) {
       if (currentStep === 0) phase = "준비 완료";
       else if (currentStep <= 4) phase = "전진 중";
-      else if (currentStep < 36) phase = "회전 중";
-      else if (currentStep === 36) phase = "회전 완료";
+      else if (currentStep < 52) phase = "회전 중";
+      else if (currentStep === 52) phase = "회전 완료";
       else if (currentStep <= maxSteps) phase = "전진 중";
       else phase = "시뮬레이션 종료";
   } else if (currentMode === 4) {
       if (currentStep === 0) phase = "준비 완료";
       else if (currentStep < 4) phase = "전진 중";
-      else if (currentStep <= 19) phase = "회전 중";
-      else if (currentStep <= 23) phase = "대열 복원 중";
+      else if (currentStep <= 23) phase = "회전 중";
+      else if (currentStep <= 27) phase = "대열 복원 중";
       else if (currentStep < maxSteps) phase = "전진 중";
       else phase = "시뮬레이션 종료";
   } else if (currentMode === 5) {
       if (currentStep === 0) phase = "준비 완료";
       else if (currentStep < 4) phase = "전진 중";
-      else if (currentStep <= 12) phase = "회전 중";
-      else if (currentStep <= 18) phase = "대열 복원 중";
+      else if (currentStep <= 16) phase = "회전 중";
+      else if (currentStep <= 22) phase = "대열 복원 중";
       else if (currentStep < maxSteps) phase = "전진 중";
       else phase = "시뮬레이션 종료";
   }
@@ -677,7 +677,7 @@ function runLogicMode1() {
   }
 
   const getPerson = (row, col) => people.find(p => p.xIdx === row && p.yIdx === col);
-  maxSteps = 22;
+  maxSteps = 26; 
   
   for (let step = 1; step <= maxSteps; step++) {
     for (let r = 1; r <= m; r++) {
@@ -762,7 +762,7 @@ function runLogicMode2() {
     }
   }
   
-  maxSteps = 34; 
+  maxSteps = 40; 
 
   for (let step = 1; step <= maxSteps; step++) {
     people.forEach(p => {
@@ -771,7 +771,7 @@ function runLogicMode2() {
         let rowDelay = (r - 1) * 2;
         let myRotationStartStep = 4 + rowDelay;
 
-        if (step < 20) {
+        if (step < 24) {
             if (step <= myRotationStartStep) p.moveNorth(1.0);
             else {
                 let t = step - myRotationStartStep;
@@ -781,13 +781,13 @@ function runLogicMode2() {
             }
         } 
         else {
-            let myStopStep = 20 + (c - 1) * 2;
+            let myStopStep = 24 + (c - 1) * 2;
             
             if (step < myStopStep) {
                 p.moveWest(0.5); 
             } else if (step === myStopStep) {
                 p.stop();
-            } else if (step <= 28) {
+            } else if (step <= myStopStep + 8) {
                 p.stop();
             } else {
                 p.moveWest(0.5); 
@@ -806,7 +806,7 @@ function runLogicMode3() {
     }
   }
   
-  maxSteps = 38; 
+  maxSteps = 60; 
 
   for (let step = 1; step <= maxSteps; step++) {
     people.forEach(p => {
@@ -819,7 +819,7 @@ function runLogicMode3() {
         if (step <= 4) {
             p.moveNorth(1.0);
         } 
-        else if (step <= 36) {
+        else if (step <= 56) {
             if (step < rotStart) {
                 p.moveNorth(0.25); 
             } 
@@ -853,7 +853,7 @@ function runLogicMode4() {
     }
   }
   
-  maxSteps = 25; 
+  maxSteps = 30; 
   for (let step = 1; step <= maxSteps; step++) {
     people.forEach(p => {
         let r = p.xIdx;
@@ -939,7 +939,7 @@ function runLogicMode5() {
     }
   }
   
-  maxSteps = 20; 
+  maxSteps = 25; 
   for (let step = 1; step <= maxSteps; step++) {
     people.forEach(p => {
         let r = p.xIdx;
@@ -979,43 +979,64 @@ function render(isInitialBuild = false) {
   const shortSide = Math.min(width, height);
   const targetSubwayLength = shortSide * 0.45;
   const initialSpan = Math.max(n * 2, m * 2);
-  const cellSize = targetSubwayLength / (initialSpan > 0 ? initialSpan : 1);
+  
+  // 세로 모드일 때 화면 스케일을 직접 1.5배로 곱하여 네이티브 확대
+  let cellSize = targetSubwayLength / (initialSpan > 0 ? initialSpan : 1);
+  if (width < height) {
+      cellSize *= 1.5;
+  }
   const radius = cellSize * 0.45; 
 
   const bottomUI = document.querySelector('.bottom-ui-wrapper');
   const bottomOffset = bottomUI ? bottomUI.offsetHeight + 16 : 220; 
   const effectiveHeight = height - bottomOffset;
 
-  let baseOriginX = (width / 2) - (2 * cellSize);
-  let targetYRatio = (currentMode === 4 || currentMode === 5) ? 0.625 : 0.75;
-  let initialCenterY = (currentMode === 4 || currentMode === 5) ? (2 * cellSize) : (5 * cellSize);
+  // 동적 중앙 배치 (step 0에서 6-2, 6-3을 제외한 실존 대열의 경계 박스 계산)
+  let initMinY = Infinity, initMaxY = -Infinity;
+  let initMinX = Infinity, initMaxX = -Infinity;
+  people.forEach(p => {
+    if (p.id === '6-2' || p.id === '6-3') return;
+    if (p.history[0]) {
+      let sy = p.history[0].y * cellSize;
+      let sx = p.history[0].x * cellSize;
+      if (sy < initMinY) initMinY = sy;
+      if (sy > initMaxY) initMaxY = sy;
+      if (sx < initMinX) initMinX = sx;
+      if (sx > initMaxX) initMaxX = sx;
+    }
+  });
+  
+  let initialCenterY = (initMinY + initMaxY) / 2;
+  let initialCenterX = (initMinX + initMaxX) / 2;
 
-  let baseOriginY = (effectiveHeight * targetYRatio) - initialCenterY;
+  let baseOriginX = (width / 2) - initialCenterX;
+  let baseOriginY = (effectiveHeight / 2) - initialCenterY;
 
   let cameraOffsetX = 0;
   let cameraOffsetY = 0;
   const marginX = width * 0.125;
   
-  // UI 요소(회전 방식 선택 박스) 하단을 기준으로 marginTop 동적 계산
-  let marginTop = effectiveHeight * 0.15; // 기본값
+  let marginTop = effectiveHeight * 0.15;
   const modeOverlay = document.querySelector('.mode-overlay');
   if (modeOverlay) {
     const overlayRect = modeOverlay.getBoundingClientRect();
     const svgRect = svg.getBoundingClientRect();
-    // 모드 오버레이 UI의 하단선 + 여유공간(20px) 설정
     marginTop = Math.max(0, overlayRect.bottom - svgRect.top) + 20;
   }
-  
   const marginBottom = effectiveHeight * 0.02;
 
+  // 카메라 바운딩 박스 연산 (step 0도 포함시켜 최초부터 화면 밖을 벗어나면 보정하도록 설정)
   for (let i = 0; i <= currentStep; i++) {
     let stepMinX = Infinity, stepMaxX = -Infinity;
     let stepMinY = Infinity, stepMaxY = -Infinity;
     let hasMoving = false;
     
     people.forEach(p => {
+      if (p.id === '6-2' || p.id === '6-3') return; 
+      
       const state = p.history[i];
-      if (state && state.isMoving) {
+      // step 0이거나 이동 중일 때 바운딩 박스 산출
+      if (state && (state.isMoving || i === 0)) {
         hasMoving = true;
         stepMinX = Math.min(stepMinX, state.x * cellSize);
         stepMaxX = Math.max(stepMaxX, state.x * cellSize);
@@ -1036,14 +1057,19 @@ function render(isInitialBuild = false) {
     let adjustLeft = sMinX < marginX ? (marginX - sMinX) : 0;
     let adjustRight = sMaxX > width - marginX ? ((width - marginX) - sMaxX) : 0;
 
+    // Y축 카메라 보정과 X축 카메라 보정을 분리하여 왼쪽 이탈 버그 완벽 수정
     if (adjustTop !== 0 && adjustBottom !== 0) {
       cameraOffsetY += adjustTop; 
     } else if (adjustTop !== 0) {
       cameraOffsetY += adjustTop;
-    } else if (adjustLeft !== 0) {
-      cameraOffsetX += adjustLeft;
     } else if (adjustBottom !== 0) {
       cameraOffsetY += adjustBottom;
+    }
+
+    if (adjustLeft !== 0 && adjustRight !== 0) {
+      cameraOffsetX += adjustLeft;
+    } else if (adjustLeft !== 0) {
+      cameraOffsetX += adjustLeft;
     } else if (adjustRight !== 0) {
       cameraOffsetX += adjustRight;
     }
@@ -1086,7 +1112,13 @@ function render(isInitialBuild = false) {
       g.setAttribute('id', `person-${p.id}`);
       g.setAttribute('class', 'person-group');
       g.style.cursor = 'pointer';
-      g.onclick = () => toggleHighlight(p.id);
+      
+      // 6-2, 6-3 투명/터치 불가 처리
+      if (p.id === '6-2' || p.id === '6-3') {
+        g.style.display = 'none';
+      } else {
+        g.onclick = () => toggleHighlight(p.id);
+      }
 
       const hitbox = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       hitbox.setAttribute('class', 'hitbox');
@@ -1160,6 +1192,8 @@ function render(isInitialBuild = false) {
   sortedPeople.forEach(p => {
     const g = document.getElementById(`person-${p.id}`);
     if (!g) return;
+    if (p.id === '6-2' || p.id === '6-3') return; 
+    
     const state = p.history[currentStep];
     if (!state) return;
 
@@ -1322,6 +1356,7 @@ function showTutorialStep() {
     if (groups.length > 0) {
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         groups.forEach(g => {
+            if (g.style.display === 'none') return; // 가상 인원 제외
             const bbox = g.getBoundingClientRect();
             if(bbox.left < minX) minX = bbox.left;
             if(bbox.top < minY) minY = bbox.top;
